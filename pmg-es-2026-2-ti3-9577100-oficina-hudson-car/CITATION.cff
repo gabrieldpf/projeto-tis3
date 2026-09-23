@@ -1,0 +1,31 @@
+cff-version: 1.0.1
+message: Please cite this software using these metadata.
+title: 
+authors:
+  - family-names: Sobrenome do aluno 1
+    given-names: Nome do aluno 1
+  - family-names: Sobrenome do aluno 2
+    given-names: Nome do aluno 2
+  - family-names: Sobrenome do aluno 3
+    given-names: Nome do aluno 3
+  - family-names: Sobrenome do aluno 4
+    given-names: Nome do aluno 4
+  - family-names: Sobrenome do aluno 5
+    given-names: Nome do aluno 5
+  - family-names: Sobrenome do aluno 6
+    given-names: Nome do aluno 6
+  - name-suffix: Professora
+    affiliation: PUC Minas
+    family-names: Alonso Veloso
+    given-names: Eveline
+  - name-suffix: Professora
+    affiliation: PUC Minas
+    family-names: Amaral Baroni de Carvalho
+    given-names: Juliana
+keywords:
+  - 
+  - 
+repository-code: 
+license: CC-BY-4.0
+version: 1.0.0
+date-released:

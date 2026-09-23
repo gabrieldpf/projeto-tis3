@@ -1,0 +1,123 @@
+// Schema do banco — Oficina Hudson Car (Sprint 1).
+// Banco: SQLite (arquivo local, sem Docker).
+//
+// Observações de design ditadas pelo SQLite e pelas regras de ouro:
+// - SQLite não tem enums nativos: os "enums" (papel, unidade, tipo de
+//   movimentação) são String e validados na aplicação com Zod (src/lib/validation.ts).
+// - Valores monetários e quantidades usam Float (protótipo). Se migrar para
+//   PostgreSQL depois, trocar o provider e considerar Decimal.
+// - Entidades editáveis têm `version` (Int) para controle otimista de
+//   concorrência — regra de ouro nº 4 (edição simultânea sem perder dados).
+// - `precoDia` é sempre manual (nunca média/fixo) e guarda auditoria de
+//   quem/quando atualizou — regra de ouro nº 3.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Usuários do sistema. Só 3 pessoas usam: Charlles (ADMIN), o irmão (GESTOR)
+/// e o Vitor (OPERACIONAL). Papel controla o RBAC — financeiro é só ADMIN.
+model Usuario {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String   @unique
+  senhaHash String
+  papel     String // ADMIN | GESTOR | OPERACIONAL
+  cargo     String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // auditoria
+  precosAtualizados Peca[]                @relation("PrecoAtualizadoPor")
+  movimentacoes     MovimentacaoEstoque[]
+}
+
+/// Fornecedores (~20 a 25). Peça é comprada sob demanda na maioria dos casos.
+model Fornecedor {
+  id         String   @id @default(cuid())
+  nome       String
+  documento  String? // CNPJ/CPF
+  telefone   String?
+  email      String?
+  categoria  String?
+  observacao String?
+  ativo      Boolean  @default(true)
+  version    Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  pecas Peca[]
+
+  @@index([nome])
+}
+
+/// Peça de reposição. `precoDia` é o "preço do dia" (manual). O saldo em
+/// estoque (`quantidadeAtual`) só muda via MovimentacaoEstoque (rastreável).
+model Peca {
+  id           String  @id @default(cuid())
+  nome         String
+  codigo       String? @unique
+  categoria    String
+  subcategoria String?
+  unidade      String  @default("UN") // UN | L | KG | PC | ...
+  fornecedorId String?
+  fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
+
+  // preço do dia (manual, com auditoria — regra de ouro nº 3)
+  precoDia               Float    @default(0)
+  precoDiaAtualizadoEm   DateTime @default(now())
+  precoDiaAtualizadoPorId String?
+  precoDiaAtualizadoPor   Usuario? @relation("PrecoAtualizadoPor", fields: [precoDiaAtualizadoPorId], references: [id], onDelete: SetNull)
+
+  // estoque
+  quantidadeAtual Float @default(0)
+  estoqueMinimo   Float @default(0)
+
+  ativo     Boolean  @default(true)
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chassisCompativeis ChassiCompativel[]
+  movimentacoes      MovimentacaoEstoque[]
+
+  @@index([nome])
+  @@index([categoria])
+}
+
+/// Chassis compatíveis com a peça — habilita a BUSCA POR CHASSI, principal
+/// dor do cliente (evita comprar/instalar a peça errada).
+model ChassiCompativel {
+  id            String @id @default(cuid())
+  pecaId        String
+  peca          Peca   @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+  chassi        String
+  modeloVeiculo String?
+
+  @@unique([pecaId, chassi])
+  @@index([chassi])
+}
+
+/// Todo movimento de estoque é registrado (entrada, saída ou ajuste). Hoje o
+/// cliente perde controle porque peça instalada some do estoque sem baixa.
+model MovimentacaoEstoque {
+  id               String   @id @default(cuid())
+  pecaId           String
+  peca             Peca     @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+  tipo             String // ENTRADA | SAIDA | AJUSTE
+  quantidade       Float
+  saldoResultante  Float
+  motivo           String?
+  usuarioId        String
+  usuario          Usuario  @relation(fields: [usuarioId], references: [id])
+  createdAt        DateTime @default(now())
+
+  @@index([pecaId])
+  @@index([createdAt])
+}
