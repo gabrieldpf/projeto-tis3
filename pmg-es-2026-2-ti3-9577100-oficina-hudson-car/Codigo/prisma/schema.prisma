@@ -1,11 +1,12 @@
 // Schema do banco — Oficina Hudson Car (Sprint 1).
-// Banco: SQLite (arquivo local, sem Docker).
+// Banco: PostgreSQL (produção na Vercel via Supabase; dev local também Postgres).
 //
-// Observações de design ditadas pelo SQLite e pelas regras de ouro:
-// - SQLite não tem enums nativos: os "enums" (papel, unidade, tipo de
-//   movimentação) são String e validados na aplicação com Zod (src/lib/validation.ts).
-// - Valores monetários e quantidades usam Float (protótipo). Se migrar para
-//   PostgreSQL depois, trocar o provider e considerar Decimal.
+// Observações de design ditadas pelas regras de ouro:
+// - Os "enums" (papel, unidade, tipo de movimentação) são String e validados
+//   na aplicação com Zod (src/lib/validation.ts) — mantidos como String para
+//   não travar o cadastro manual do cliente.
+// - Valores monetários e quantidades usam Float (protótipo). TODO: migrar para
+//   Decimal (@db.Decimal) antes de lidar com faturamento real — regra de ouro nº 3.
 // - Entidades editáveis têm `version` (Int) para controle otimista de
 //   concorrência — regra de ouro nº 4 (edição simultânea sem perder dados).
 // - `precoDia` é sempre manual (nunca média/fixo) e guarda auditoria de
@@ -16,8 +17,12 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Conexão "pooled" (PgBouncer, porta 6543 no Supabase) usada pelo app em
+  // ambiente serverless. Ex.: ...pooler.supabase.com:6543/postgres?pgbouncer=true
+  url       = env("DATABASE_URL")
+  // Conexão direta (porta 5432) usada por `prisma migrate deploy`/`db push`.
+  directUrl = env("DIRECT_URL")
 }
 
 /// Usuários do sistema. Só 3 pessoas usam: Charlles (ADMIN), o irmão (GESTOR)
