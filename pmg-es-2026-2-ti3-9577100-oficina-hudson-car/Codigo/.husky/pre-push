@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Hook de pre-push (Husky): bloqueia o push se a verificação local falhar.
+# Roda lint + typecheck + testes. Os testes exigem o Postgres de teste no ar
+# (suba com `npm run db:test:up`).
+cd "$(git rev-parse --show-toplevel)/pmg-es-2026-2-ti3-9577100-oficina-hudson-car/Codigo" || exit 1
+echo "› Verificação local (npm run check) antes do push…"
+npm run check

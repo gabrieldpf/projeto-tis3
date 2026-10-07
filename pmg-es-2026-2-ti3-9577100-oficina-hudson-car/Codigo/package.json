@@ -12,12 +12,16 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check": "npm run lint && npm run typecheck && npm run test",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset --force",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "setup": "prisma migrate dev --name init && npm run db:seed"
+    "db:test:up": "docker run -d --name hudson-pg-test -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=hudson_test -p 55432:5432 postgres:16-alpine",
+    "db:test:down": "docker rm -f hudson-pg-test",
+    "setup": "prisma migrate dev --name init && npm run db:seed",
+    "prepare": "git config --local core.hooksPath pmg-es-2026-2-ti3-9577100-oficina-hudson-car/Codigo/.husky || true"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -44,6 +48,7 @@
     "@types/react-dom": "^18.3.1",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.18",
+    "husky": "^9.1.7",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",

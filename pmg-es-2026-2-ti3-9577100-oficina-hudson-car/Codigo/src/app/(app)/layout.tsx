@@ -51,7 +51,7 @@ const TITULOS: Record<string, { titulo: string; sub: string }> = {
   '/fornecedores': { titulo: 'Fornecedores', sub: 'Cadastro e gestão de fornecedores' },
   '/veiculos': { titulo: 'Veículos', sub: 'Histórico e fotos por veículo' },
   '/clientes': { titulo: 'Clientes', sub: 'Cadastro e contatos' },
-  '/relatorios': { titulo: 'Relatórios', sub: 'Financeiro — acesso restrito' },
+  '/relatorios': { titulo: 'Relatórios', sub: 'Financeiro · acesso restrito' },
 }
 
 function iniciais(nome: string): string {
@@ -108,9 +108,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </>
         )}
 
-        <div className="rodape">
-          Sprint 1 · TIS3 · PUC Minas · 2026
-        </div>
       </aside>
 
       <div className="conteudo">

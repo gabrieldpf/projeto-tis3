@@ -41,6 +41,7 @@ model Usuario {
   // auditoria
   precosAtualizados Peca[]                @relation("PrecoAtualizadoPor")
   movimentacoes     MovimentacaoEstoque[]
+  orcamentosCriados Orcamento[]           @relation("OrcamentosCriados")
 }
 
 /// Fornecedores (~20 a 25). Peça é comprada sob demanda na maioria dos casos.
@@ -91,6 +92,7 @@ model Peca {
 
   chassisCompativeis ChassiCompativel[]
   movimentacoes      MovimentacaoEstoque[]
+  itensOrcamento     ItemOrcamento[]
 
   @@index([nome])
   @@index([categoria])
@@ -107,6 +109,140 @@ model ChassiCompativel {
 
   @@unique([pecaId, chassi])
   @@index([chassi])
+}
+
+/// Clientes da oficina (~95% pessoa física). Dados migrados do sistema legado.
+/// `version` habilita concorrência otimista (regra de ouro nº 4).
+model Cliente {
+  id        String   @id @default(cuid())
+  nome      String
+  telefone  String?
+  documento String? // CPF/CNPJ
+  email     String?
+  observacao String?
+  desde     DateTime @default(now()) // 1º atendimento
+  ativo     Boolean  @default(true)
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  veiculos       Veiculo[]
+  orcamentos     Orcamento[]
+  ordensServico  OrdemServico[]
+
+  @@index([nome])
+}
+
+/// Veículos vinculados a um cliente. A busca por CHASSI ajuda a achar a peça
+/// certa (prioridade nº 2). `placa` é única (não cadastrar o mesmo carro 2x).
+model Veiculo {
+  id        String  @id @default(cuid())
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  placa     String? @unique
+  chassi    String?
+  marca     String?
+  modelo    String?
+  ano       Int?
+  cor       String?
+  ativo     Boolean  @default(true)
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orcamentos    Orcamento[]
+  ordensServico OrdemServico[]
+
+  @@index([chassi])
+}
+
+/// Mecânicos da oficina. NÃO usam o sistema; só são atribuídos à OS como
+/// responsável principal pelo carro.
+model Mecanico {
+  id        String   @id @default(cuid())
+  nome      String
+  ativo     Boolean  @default(true)
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ordensServico OrdemServico[]
+
+  @@index([nome])
+}
+
+/// Orçamento do serviço. Status em String validado por Zod. Controle otimista
+/// por `version` no cabeçalho e por item (regra de ouro nº 4 — edição simultânea
+/// sem perda de dados). AUTORIZADO/RECUSADO não é mais editável.
+model Orcamento {
+  id               String  @id @default(cuid())
+  numero           String  @unique
+  clienteId        String
+  cliente          Cliente @relation(fields: [clienteId], references: [id])
+  veiculoId        String
+  veiculo          Veiculo @relation(fields: [veiculoId], references: [id])
+  status           String  @default("RASCUNHO") // RASCUNHO | AGUARDANDO_AUTORIZACAO | AUTORIZADO | RECUSADO
+  observacao       String?
+  responsavel      String?
+  criadoPorId      String?
+  criadoPor        Usuario?  @relation("OrcamentosCriados", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  autorizadoEm     DateTime?
+  formaAutorizacao String? // PRESENCIAL | TELEFONE | WHATSAPP
+  version          Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  itens         ItemOrcamento[]
+  ordemServico  OrdemServico?
+
+  @@index([clienteId])
+  @@index([veiculoId])
+  @@index([status])
+}
+
+/// Item de orçamento — peça ou mão de obra. `valorUnitario` é a CÓPIA do preço
+/// do dia no momento em que a peça entra (nunca recalculado — regra de ouro nº 3).
+/// `version` dá controle otimista por item (2 pessoas em itens diferentes não
+/// conflitam; só o mesmo item).
+model ItemOrcamento {
+  id            String    @id @default(cuid())
+  orcamentoId   String
+  orcamento     Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  tipo          String // PECA | MAO_DE_OBRA
+  pecaId        String?
+  peca          Peca?     @relation(fields: [pecaId], references: [id], onDelete: SetNull)
+  descricao     String
+  quantidade    Float     @default(1)
+  valorUnitario Float     @default(0)
+  version       Int       @default(1)
+
+  @@index([orcamentoId])
+}
+
+/// Ordem de serviço — gerada SOMENTE a partir de um orçamento AUTORIZADO, e no
+/// máximo uma por orçamento (`orcamentoId` único). Mecânico é obrigatório.
+model OrdemServico {
+  id              String     @id @default(cuid())
+  numero          String     @unique
+  orcamentoId     String     @unique
+  orcamento       Orcamento  @relation(fields: [orcamentoId], references: [id])
+  clienteId       String
+  cliente         Cliente    @relation(fields: [clienteId], references: [id])
+  veiculoId       String
+  veiculo         Veiculo    @relation(fields: [veiculoId], references: [id])
+  mecanicoId      String
+  mecanico        Mecanico   @relation(fields: [mecanicoId], references: [id])
+  status          String     @default("ABERTA") // ABERTA | EM_ANDAMENTO | AGUARDANDO_PECA | PRONTA | ENTREGUE
+  aberturaEm      DateTime   @default(now())
+  previsaoEntrega DateTime?
+  entregueEm      DateTime?
+  version         Int        @default(1)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([clienteId])
+  @@index([veiculoId])
+  @@index([status])
 }
 
 /// Todo movimento de estoque é registrado (entrada, saída ou ajuste). Hoje o

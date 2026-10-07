@@ -70,7 +70,7 @@ function ModalFornecedor({ fornecedor, onFechar, onSalvo }: ModalFornecedorProps
       onSalvo(salvo)
     } catch (e) {
       if (e instanceof ApiClientError && e.code === 'CONFLITO') {
-        setErro('Registro desatualizado — recarregue a página e tente novamente.')
+        setErro('Registro desatualizado. Recarregue a página e tente novamente.')
       } else {
         const msg = e instanceof ApiClientError ? e.message : 'Não foi possível salvar.'
         setErro(msg)
@@ -298,9 +298,9 @@ export default function PaginaFornecedores() {
                       </>
                     )}
                   </td>
-                  <td>{f.categoria ?? <span className="txt-suave">—</span>}</td>
-                  <td className="mono">{f.telefone ?? <span className="txt-suave">—</span>}</td>
-                  <td className="txt-suave">{f.email ?? '—'}</td>
+                  <td>{f.categoria ?? <span className="txt-suave">Sem categoria</span>}</td>
+                  <td className="mono">{f.telefone ?? <span className="txt-suave">Sem telefone</span>}</td>
+                  <td className="txt-suave">{f.email ?? 'Sem e-mail'}</td>
                   <td className="txt-suave">{formatarData(f.createdAt)}</td>
                   <td>
                     <button

@@ -2,17 +2,10 @@
 // Início / Dashboard.
 // Os cards financeiros só são renderizados para o admin (regra de ouro nº 2).
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
-import {
-  clientePorId,
-  estoque,
-  financeiro,
-  ordensServico,
-  orcamentos,
-  pecaPorId,
-  veiculoPorId,
-} from '@/data/mock'
+import { financeiro } from '@/data/mock'
 import { moeda, variacaoPercentual } from '@/utils/format'
 import { BadgeOS, BadgeOrcamento } from '@/components/Badges'
 import {
@@ -23,15 +16,59 @@ import {
   IconeVeiculo,
   IconeAlerta,
 } from '@/components/icons'
+import {
+  listarOrdensServico,
+  listarOrcamentos,
+  listarAlertas,
+  type OrdemServicoApi,
+  type OrcamentoApi,
+  type AlertaCompraApi,
+  ApiClientError,
+} from '@/lib/api'
+import type { StatusOS, StatusOrcamento } from '@/lib/constants'
 
 export default function PaginaInicio() {
   const { usuario, ehAdmin } = useAuth()
 
-  const osAtivas = ordensServico.filter((os) => os.status !== 'entregue')
-  const aguardandoAutorizacao = orcamentos.filter(
-    (o) => o.status === 'aguardando_autorizacao',
-  )
-  const alertasEstoque = estoque.filter((e) => e.quantidade <= e.minimo)
+  const [osAtivas, setOsAtivas] = useState<OrdemServicoApi[]>([])
+  const [aguardandoAutorizacao, setAguardandoAutorizacao] = useState<OrcamentoApi[]>([])
+  const [alertas, setAlertas] = useState<AlertaCompraApi[]>([])
+  const [carregando, setCarregando] = useState(true)
+
+  useEffect(() => {
+    let cancelado = false
+
+    async function carregar() {
+      setCarregando(true)
+      const [todasOS, orcamentosPendentes, alertasEstoque] = await Promise.all([
+        listarOrdensServico({}).catch((err) => {
+          if (!(err instanceof ApiClientError)) console.error(err)
+          return [] as OrdemServicoApi[]
+        }),
+        listarOrcamentos({ status: 'AGUARDANDO_AUTORIZACAO' }).catch((err) => {
+          if (!(err instanceof ApiClientError)) console.error(err)
+          return [] as OrcamentoApi[]
+        }),
+        listarAlertas().catch((err) => {
+          if (!(err instanceof ApiClientError)) console.error(err)
+          return [] as AlertaCompraApi[]
+        }),
+      ])
+
+      if (cancelado) return
+
+      setOsAtivas(todasOS.filter((os) => os.status !== 'ENTREGUE'))
+      setAguardandoAutorizacao(orcamentosPendentes)
+      setAlertas(alertasEstoque)
+      setCarregando(false)
+    }
+
+    void carregar()
+
+    return () => {
+      cancelado = true
+    }
+  }, [])
 
   return (
     <>
@@ -45,25 +82,25 @@ export default function PaginaInicio() {
           <div className="rotulo">
             <IconeOS fontSize="small" /> Serviços em andamento
           </div>
-          <div className="valor">{osAtivas.length}</div>
+          <div className="valor">{carregando ? '…' : osAtivas.length}</div>
           <div className="sub">ordens de serviço abertas</div>
         </div>
         <div className="stat-card">
           <div className="rotulo">
             <IconeOrcamento fontSize="small" /> Aguardando autorização
           </div>
-          <div className="valor">{aguardandoAutorizacao.length}</div>
+          <div className="valor">{carregando ? '…' : aguardandoAutorizacao.length}</div>
           <div className="sub">orçamentos pendentes do cliente</div>
         </div>
         <div className="stat-card">
           <div className="rotulo">
             <IconeEstoque fontSize="small" /> Alertas de compra
           </div>
-          <div className="valor">{alertasEstoque.length}</div>
+          <div className="valor">{carregando ? '…' : alertas.length}</div>
           <div className="sub">itens no/abaixo do mínimo</div>
         </div>
 
-        {/* Card financeiro — SOMENTE ADMIN */}
+        {/* Card financeiro — SOMENTE ADMIN (regra de ouro nº 2) */}
         {ehAdmin ? (
           <div className="stat-card destaque">
             <div className="rotulo">
@@ -100,40 +137,44 @@ export default function PaginaInicio() {
             Ver todos
           </Link>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Orçamento</th>
-              <th>Cliente</th>
-              <th>Veículo</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {aguardandoAutorizacao.map((o) => {
-              const v = veiculoPorId(o.veiculoId)
-              return (
+        {carregando ? (
+          <p className="txt-suave" style={{ padding: '12px 0' }}>Carregando…</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Orçamento</th>
+                <th>Cliente</th>
+                <th>Veículo</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {aguardandoAutorizacao.map((o) => (
                 <tr key={o.id}>
                   <td className="mono forte">{o.numero}</td>
-                  <td>{clientePorId(o.clienteId)?.nome}</td>
+                  <td>{o.cliente?.nome ?? '—'}</td>
                   <td>
-                    {v?.marca} {v?.modelo} · <span className="mono">{v?.placa}</span>
+                    {o.veiculo?.marca} {o.veiculo?.modelo}
+                    {o.veiculo?.placa ? (
+                      <> · <span className="mono">{o.veiculo.placa}</span></>
+                    ) : null}
                   </td>
                   <td>
-                    <BadgeOrcamento status={o.status} />
+                    <BadgeOrcamento status={o.status as StatusOrcamento} />
                   </td>
                 </tr>
-              )
-            })}
-            {aguardandoAutorizacao.length === 0 && (
-              <tr>
-                <td colSpan={4} className="vazio">
-                  Nenhum orçamento pendente no momento.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              ))}
+              {aguardandoAutorizacao.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="vazio">
+                    Nenhum orçamento pendente no momento.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Serviços em andamento */}
@@ -147,39 +188,50 @@ export default function PaginaInicio() {
             Ver todas
           </Link>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>OS</th>
-              <th>Veículo</th>
-              <th>Responsável</th>
-              <th>Previsão</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {osAtivas.map((os) => {
-              const v = veiculoPorId(os.veiculoId)
-              return (
+        {carregando ? (
+          <p className="txt-suave" style={{ padding: '12px 0' }}>Carregando…</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>OS</th>
+                <th>Veículo</th>
+                <th>Responsável</th>
+                <th>Previsão</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {osAtivas.map((os) => (
                 <tr key={os.id}>
                   <td className="mono forte">{os.numero}</td>
                   <td>
-                    {v?.marca} {v?.modelo} · <span className="mono">{v?.placa}</span>
+                    {os.veiculo?.marca} {os.veiculo?.modelo}
+                    {os.veiculo?.placa ? (
+                      <> · <span className="mono">{os.veiculo.placa}</span></>
+                    ) : null}
                   </td>
-                  <td>{os.responsavel}</td>
-                  <td>{os.previsaoEntrega.split('-').reverse().join('/')}</td>
+                  <td>{os.mecanico?.nome ?? 'A definir'}</td>
+                  <td>{os.previsaoEntrega ? new Date(os.previsaoEntrega).toLocaleDateString('pt-BR') : 'A definir'}</td>
                   <td>
-                    <BadgeOS status={os.status} />
+                    <BadgeOS status={os.status as StatusOS} />
                   </td>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              ))}
+              {osAtivas.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="vazio">
+                    Nenhuma ordem de serviço em andamento no momento.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      {/* Alertas de estoque */}
-      {alertasEstoque.length > 0 && (
+      {/* Peças para comprar — só exibe se houver alertas */}
+      {!carregando && alertas.length > 0 && (
         <div className="card">
           <div className="card-head">
             <div>
@@ -202,20 +254,17 @@ export default function PaginaInicio() {
               </tr>
             </thead>
             <tbody>
-              {alertasEstoque.map((e) => {
-                const p = pecaPorId(e.pecaId)
-                return (
-                  <tr key={e.pecaId} className="linha-alerta">
-                    <td className="forte">{p?.nome}</td>
-                    <td>
-                      {e.quantidade} {e.unidade}
-                    </td>
-                    <td>
-                      {e.minimo} {e.unidade}
-                    </td>
-                  </tr>
-                )
-              })}
+              {alertas.map((alerta) => (
+                <tr key={alerta.id} className="linha-alerta">
+                  <td className="forte">{alerta.nome}</td>
+                  <td>
+                    {alerta.quantidadeAtual} {alerta.unidade}
+                  </td>
+                  <td>
+                    {alerta.estoqueMinimo} {alerta.unidade}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

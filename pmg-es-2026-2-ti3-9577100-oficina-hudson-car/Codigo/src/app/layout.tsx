@@ -8,7 +8,7 @@ import { Providers } from '@/components/Providers'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Hudson Car — Gestão da oficina',
+  title: 'Hudson Car · Gestão da oficina',
   description: 'Sistema de gestão da oficina mecânica Hudson Car.',
 }
 

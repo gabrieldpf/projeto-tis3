@@ -2,7 +2,14 @@
 // de escrita. Enums de domínio vêm de constants.ts (fonte única da verdade).
 
 import { z } from 'zod'
-import { PAPEIS, TIPOS_MOVIMENTACAO, UNIDADES } from './constants'
+import {
+  FORMAS_AUTORIZACAO,
+  PAPEIS,
+  STATUS_OS,
+  TIPOS_ITEM_ORCAMENTO,
+  TIPOS_MOVIMENTACAO,
+  UNIDADES,
+} from './constants'
 
 // --- Auth --------------------------------------------------------------------
 export const loginSchema = z.object({
@@ -83,6 +90,114 @@ export const movimentacaoSchema = z.object({
   motivo: z.string().trim().optional(),
 })
 export type MovimentacaoInput = z.infer<typeof movimentacaoSchema>
+
+// --- Cliente -----------------------------------------------------------------
+export const clienteCreateSchema = z.object({
+  nome: z.string().trim().min(2, 'Nome é obrigatório.'),
+  telefone: z.string().trim().optional(),
+  documento: z.string().trim().optional(),
+  email: z.string().trim().email('E-mail inválido.').optional().or(z.literal('')),
+  observacao: z.string().trim().optional(),
+})
+export type ClienteCreateInput = z.infer<typeof clienteCreateSchema>
+
+export const clienteUpdateSchema = clienteCreateSchema.partial().extend({
+  ativo: z.boolean().optional(),
+  version: z.number().int().optional(),
+})
+
+// --- Veículo -----------------------------------------------------------------
+export const veiculoCreateSchema = z.object({
+  clienteId: z.string().trim().min(1, 'Cliente é obrigatório.'),
+  placa: z.string().trim().optional(),
+  chassi: z.string().trim().optional(),
+  marca: z.string().trim().optional(),
+  modelo: z.string().trim().optional(),
+  ano: z.number().int().min(1900).max(2100).optional(),
+  cor: z.string().trim().optional(),
+})
+export type VeiculoCreateInput = z.infer<typeof veiculoCreateSchema>
+
+export const veiculoUpdateSchema = veiculoCreateSchema.partial().extend({
+  ativo: z.boolean().optional(),
+  version: z.number().int().optional(),
+})
+
+// --- Mecânico ----------------------------------------------------------------
+export const mecanicoCreateSchema = z.object({
+  nome: z.string().trim().min(2, 'Nome do mecânico é obrigatório.'),
+})
+export type MecanicoCreateInput = z.infer<typeof mecanicoCreateSchema>
+
+export const mecanicoUpdateSchema = z.object({
+  nome: z.string().trim().min(2).optional(),
+  ativo: z.boolean().optional(),
+  version: z.number().int().optional(),
+})
+
+// --- Orçamento ---------------------------------------------------------------
+// Item digitado na criação do orçamento. `valorUnitario` é a cópia do preço do
+// dia (nunca recalculado); `pecaId` liga à peça quando o item é uma peça.
+export const itemOrcamentoSchema = z.object({
+  tipo: z.enum(TIPOS_ITEM_ORCAMENTO),
+  pecaId: z.string().trim().optional(),
+  descricao: z.string().trim().min(1, 'Descrição do item é obrigatória.'),
+  quantidade: z.number().positive('Quantidade deve ser maior que zero.').default(1),
+  valorUnitario: z.number().nonnegative('Valor não pode ser negativo.').default(0),
+})
+
+export const orcamentoCreateSchema = z.object({
+  clienteId: z.string().trim().min(1, 'Cliente é obrigatório.'),
+  veiculoId: z.string().trim().min(1, 'Veículo é obrigatório.'),
+  observacao: z.string().trim().optional(),
+  responsavel: z.string().trim().optional(),
+  itens: z.array(itemOrcamentoSchema).default([]),
+})
+export type OrcamentoCreateInput = z.infer<typeof orcamentoCreateSchema>
+
+// PATCH do cabeçalho do orçamento — exige `version` (controle otimista).
+export const orcamentoUpdateSchema = z.object({
+  observacao: z.string().trim().optional(),
+  responsavel: z.string().trim().optional(),
+  version: z.number().int('Versão é obrigatória para edição.'),
+})
+
+// Transição de status / autorização. `acao` dispara a mudança de status;
+// `formaAutorizacao` é obrigatória ao AUTORIZAR.
+export const orcamentoAcaoSchema = z.object({
+  acao: z.enum(['ENVIAR', 'AUTORIZAR', 'RECUSAR']),
+  formaAutorizacao: z.enum(FORMAS_AUTORIZACAO).optional(),
+  version: z.number().int('Versão é obrigatória.'),
+})
+export type OrcamentoAcaoInput = z.infer<typeof orcamentoAcaoSchema>
+
+// Novo item num orçamento existente (POST em /itens).
+export const itemCreateSchema = itemOrcamentoSchema
+
+// Edição de um item (PATCH) — exige `version` do item.
+export const itemUpdateSchema = z.object({
+  descricao: z.string().trim().min(1).optional(),
+  quantidade: z.number().positive('Quantidade deve ser maior que zero.').optional(),
+  valorUnitario: z.number().nonnegative('Valor não pode ser negativo.').optional(),
+  version: z.number().int('Versão é obrigatória para edição.'),
+})
+
+// --- Ordem de serviço --------------------------------------------------------
+// OS nasce de um orçamento AUTORIZADO; mecânico é obrigatório.
+export const ordemServicoCreateSchema = z.object({
+  orcamentoId: z.string().trim().min(1, 'Orçamento é obrigatório.'),
+  mecanicoId: z.string().trim().min(1, 'Mecânico é obrigatório.'),
+  previsaoEntrega: z.string().trim().optional(), // ISO (yyyy-mm-dd)
+})
+export type OrdemServicoCreateInput = z.infer<typeof ordemServicoCreateSchema>
+
+// Atualização da OS: troca de status (transição validada no server) e/ou mecânico.
+export const ordemServicoUpdateSchema = z.object({
+  status: z.enum(STATUS_OS).optional(),
+  mecanicoId: z.string().trim().optional(),
+  previsaoEntrega: z.string().trim().optional(),
+  version: z.number().int('Versão é obrigatória para edição.'),
+})
 
 // --- Usuário (gestão — só admin) --------------------------------------------
 export const usuarioCreateSchema = z.object({

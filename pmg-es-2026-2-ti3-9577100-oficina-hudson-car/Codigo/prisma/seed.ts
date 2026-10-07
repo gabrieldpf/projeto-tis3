@@ -17,6 +17,12 @@ const SENHA_PADRAO = 'oficina123'
 
 async function main() {
   console.log('› Limpando dados existentes…')
+  await prisma.ordemServico.deleteMany()
+  await prisma.itemOrcamento.deleteMany()
+  await prisma.orcamento.deleteMany()
+  await prisma.mecanico.deleteMany()
+  await prisma.veiculo.deleteMany()
+  await prisma.cliente.deleteMany()
   await prisma.movimentacaoEstoque.deleteMany()
   await prisma.chassiCompativel.deleteMany()
   await prisma.peca.deleteMany()
@@ -34,6 +40,40 @@ async function main() {
   })
   await prisma.usuario.create({
     data: { nome: 'Vitor Almeida', email: 'vitor@hudsoncar.local', senhaHash, papel: 'OPERACIONAL', cargo: 'Secretário' },
+  })
+
+  console.log('› Criando clientes + veículos…')
+  const clientesSeed = [
+    { nome: 'Marcos Pereira', telefone: '(16) 99911-2233', documento: '123.456.789-01' },
+    { nome: 'Ana Beatriz Souza', telefone: '(16) 98822-4455', documento: '234.567.890-12' },
+    { nome: 'Rodrigo Nogueira', telefone: '(16) 99733-6677', documento: '345.678.901-23' },
+    { nome: 'Juliana Martins', telefone: '(16) 98644-8899', documento: '456.789.012-34' },
+    { nome: 'Fernando Lima', telefone: '(16) 99555-1010', documento: '567.890.123-45' },
+  ]
+  const clientesCriados = []
+  for (const c of clientesSeed) {
+    clientesCriados.push(await prisma.cliente.create({ data: c }))
+  }
+
+  const veiculosSeed: Array<{ idx: number; placa: string; chassi: string; marca: string; modelo: string; ano: number; cor: string }> = [
+    { idx: 0, placa: 'FGH-1A23', chassi: '9BWZZZ377VT004251', marca: 'Volkswagen', modelo: 'Gol 1.6', ano: 2018, cor: 'Prata' },
+    { idx: 1, placa: 'JKL-2B34', chassi: '93HGD56209Z100882', marca: 'Honda', modelo: 'Civic EXL', ano: 2020, cor: 'Preto' },
+    { idx: 2, placa: 'MNP-3C45', chassi: '9BD17164G74112905', marca: 'Fiat', modelo: 'Argo Drive', ano: 2021, cor: 'Vermelho' },
+    { idx: 3, placa: 'QRS-4D56', chassi: '8AFAR52U9DJ501774', marca: 'Ford', modelo: 'Ka SE', ano: 2019, cor: 'Branco' },
+    { idx: 4, placa: 'TUV-5E67', chassi: '9BGKS48T0PC201336', marca: 'Chevrolet', modelo: 'Onix LT', ano: 2022, cor: 'Cinza' },
+    { idx: 0, placa: 'WXY-6F78', chassi: '9BWZZZ377VT109887', marca: 'Volkswagen', modelo: 'Saveiro', ano: 2017, cor: 'Branco' },
+  ]
+  const veiculosCriados = []
+  for (const v of veiculosSeed) {
+    const { idx, ...dados } = v
+    const dono = clientesCriados[idx]
+    if (!dono) continue
+    veiculosCriados.push(await prisma.veiculo.create({ data: { ...dados, clienteId: dono.id } }))
+  }
+
+  console.log('› Criando mecânicos…')
+  await prisma.mecanico.createMany({
+    data: [{ nome: 'José Carlos' }, { nome: 'Paulo Henrique' }, { nome: 'Anderson Silva' }],
   })
 
   console.log('› Criando fornecedores…')
@@ -59,6 +99,7 @@ async function main() {
     { codigo: 'BW-AGUA-01', nome: "Bomba d'água", categoria: 'Arrefecimento', subcategoria: 'Bombas', unidade: 'UN', fornecedorId: f.f1.id, precoDia: 214.0, quantidade: 2, minimo: 2, chassis: ['9BD17164G74112905'] },
   ]
 
+  const pecasPorCodigo: Record<string, { id: string; nome: string; precoDia: number }> = {}
   for (const p of pecas) {
     const peca = await prisma.peca.create({
       data: {
@@ -77,6 +118,7 @@ async function main() {
         },
       },
     })
+    pecasPorCodigo[p.codigo] = { id: peca.id, nome: peca.nome, precoDia: peca.precoDia }
     // Movimentação de ENTRADA inicial (rastreabilidade do saldo inicial).
     if (p.quantidade > 0) {
       await prisma.movimentacaoEstoque.create({
@@ -90,6 +132,32 @@ async function main() {
         },
       })
     }
+  }
+
+  console.log('› Criando 1 orçamento de exemplo…')
+  const veiculoGol = veiculosCriados[0]
+  const oleo = pecasPorCodigo['OL-5W30-1L']
+  const filtro = pecasPorCodigo['FI-OLEO-01']
+  if (veiculoGol && oleo && filtro) {
+    const ano = new Date().getFullYear()
+    await prisma.orcamento.create({
+      data: {
+        numero: `ORC-${ano}-0001`,
+        clienteId: veiculoGol.clienteId,
+        veiculoId: veiculoGol.id,
+        status: 'AGUARDANDO_AUTORIZACAO',
+        responsavel: 'José Carlos',
+        criadoPorId: charlles.id,
+        itens: {
+          create: [
+            // Peça entra com o preço do dia COPIADO (regra de ouro nº 3).
+            { tipo: 'PECA', pecaId: oleo.id, descricao: `${oleo.nome} (4L)`, quantidade: 4, valorUnitario: oleo.precoDia },
+            { tipo: 'PECA', pecaId: filtro.id, descricao: filtro.nome, quantidade: 1, valorUnitario: filtro.precoDia },
+            { tipo: 'MAO_DE_OBRA', descricao: 'Mão de obra: troca de óleo e revisão', quantidade: 1, valorUnitario: 120 },
+          ],
+        },
+      },
+    })
   }
 
   console.log('✓ Seed concluído.')

@@ -27,7 +27,7 @@ import {
 // -----------------------------------------------------------------------
 
 function formatarData(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return 'Nunca'
   const d = new Date(iso)
   return d.toLocaleDateString('pt-BR')
 }
@@ -103,7 +103,7 @@ function ModalPrecoDia({ peca, onFechar, onSalvo }: ModalPrecoDiaProps) {
           </div>
           <p className="txt-suave" style={{ marginTop: 8 }}>
             Preço atual: <strong>{moeda(peca.precoDia)}</strong>
-            {peca.precoDiaAtualizadoEm && ` — atualizado em ${formatarData(peca.precoDiaAtualizadoEm)}`}
+            {peca.precoDiaAtualizadoEm && ` · atualizado em ${formatarData(peca.precoDiaAtualizadoEm)}`}
           </p>
         </div>
         <div className="modal-rodape">
@@ -368,7 +368,7 @@ export default function PaginaPecas() {
         <div className="card-head">
           <div>
             <h2>Peças</h2>
-            <p>Preço do dia — atualizado manualmente pelo administrador</p>
+            <p>Preço do dia · atualizado manualmente pelo administrador</p>
           </div>
         </div>
 
@@ -392,7 +392,7 @@ export default function PaginaPecas() {
             <tbody>
               {pecas.map((p) => (
                 <tr key={p.id}>
-                  <td className="mono">{p.codigo ?? '—'}</td>
+                  <td className="mono">{p.codigo ?? 'Sem código'}</td>
                   <td className="forte">{p.nome}</td>
                   <td>
                     {p.categoria}
@@ -403,7 +403,7 @@ export default function PaginaPecas() {
                       </>
                     )}
                   </td>
-                  <td>{p.fornecedor?.nome ?? <span className="txt-suave">—</span>}</td>
+                  <td>{p.fornecedor?.nome ?? <span className="txt-suave">Sem fornecedor</span>}</td>
                   <td className="direita forte">{moeda(p.precoDia)}</td>
                   <td className="txt-suave">{formatarData(p.precoDiaAtualizadoEm)}</td>
                   <td>

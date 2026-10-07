@@ -1,6 +1,11 @@
 // Badges de status reutilizáveis, com rótulos legíveis em pt-BR.
 
-import type { StatusOrcamento, StatusOS } from '../types'
+import {
+  ROTULO_STATUS_ORCAMENTO,
+  ROTULO_STATUS_OS,
+  type StatusOrcamento,
+  type StatusOS,
+} from '@/lib/constants'
 
 type Cor = 'verde' | 'vermelho' | 'amarelo' | 'azul' | 'cinza'
 
@@ -8,27 +13,25 @@ export function Badge({ cor, texto }: { cor: Cor; texto: string }) {
   return <span className={`badge badge-ponto ${cor}`}>{texto}</span>
 }
 
-const ORCAMENTO_MAP: Record<StatusOrcamento, { cor: Cor; texto: string }> = {
-  rascunho: { cor: 'cinza', texto: 'Rascunho' },
-  aguardando_autorizacao: { cor: 'amarelo', texto: 'Aguardando autorização' },
-  autorizado: { cor: 'verde', texto: 'Autorizado' },
-  recusado: { cor: 'vermelho', texto: 'Recusado' },
+const ORCAMENTO_COR: Record<StatusOrcamento, Cor> = {
+  RASCUNHO: 'cinza',
+  AGUARDANDO_AUTORIZACAO: 'amarelo',
+  AUTORIZADO: 'verde',
+  RECUSADO: 'vermelho',
 }
 
 export function BadgeOrcamento({ status }: { status: StatusOrcamento }) {
-  const { cor, texto } = ORCAMENTO_MAP[status]
-  return <Badge cor={cor} texto={texto} />
+  return <Badge cor={ORCAMENTO_COR[status]} texto={ROTULO_STATUS_ORCAMENTO[status]} />
 }
 
-const OS_MAP: Record<StatusOS, { cor: Cor; texto: string }> = {
-  aberta: { cor: 'azul', texto: 'Aberta' },
-  em_andamento: { cor: 'azul', texto: 'Em andamento' },
-  aguardando_peca: { cor: 'amarelo', texto: 'Aguardando peça' },
-  pronta: { cor: 'verde', texto: 'Pronta' },
-  entregue: { cor: 'cinza', texto: 'Entregue' },
+const OS_COR: Record<StatusOS, Cor> = {
+  ABERTA: 'azul',
+  EM_ANDAMENTO: 'azul',
+  AGUARDANDO_PECA: 'amarelo',
+  PRONTA: 'verde',
+  ENTREGUE: 'cinza',
 }
 
 export function BadgeOS({ status }: { status: StatusOS }) {
-  const { cor, texto } = OS_MAP[status]
-  return <Badge cor={cor} texto={texto} />
+  return <Badge cor={OS_COR[status]} texto={ROTULO_STATUS_OS[status]} />
 }

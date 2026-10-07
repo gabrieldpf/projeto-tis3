@@ -11,7 +11,7 @@ export function data(iso: string): string {
 }
 
 export function variacaoPercentual(atual: number, anterior: number): string {
-  if (anterior === 0) return '—'
+  if (anterior === 0) return 'sem base'
   const pct = ((atual - anterior) / anterior) * 100
   const sinal = pct >= 0 ? '+' : ''
   return `${sinal}${pct.toFixed(1)}%`

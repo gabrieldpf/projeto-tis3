@@ -91,7 +91,7 @@ function ModalMovimentacao({ item, onFechar, onRegistrada }: ModalMovimentacaoPr
           <p className="txt-suave" style={{ marginBottom: 14 }}>
             <strong>{item.nome}</strong>
             {item.codigo ? ` · ${item.codigo}` : ''}{' '}
-            — Saldo atual: <strong>{item.quantidadeAtual} {item.unidade}</strong>
+            · Saldo atual: <strong>{item.quantidadeAtual} {item.unidade}</strong>
           </p>
 
           {erro && <div className="aviso vermelho" role="alert">{erro}</div>}
@@ -211,7 +211,7 @@ export default function PaginaEstoque() {
           <IconeAlerta sx={{ fontSize: 18 }} />
           <span>
             <strong>{totalAlertas} item(ns)</strong> no ou abaixo do estoque
-            mínimo — precisam de reposição.
+            mínimo, precisam de reposição.
           </span>
         </div>
       )}
@@ -273,8 +273,8 @@ export default function PaginaEstoque() {
                         </>
                       )}
                     </td>
-                    <td className="txt-suave">{item.subcategoria ?? '—'}</td>
-                    <td className="txt-suave">{item.fornecedor?.nome ?? '—'}</td>
+                    <td className="txt-suave">{item.subcategoria ?? 'Sem subcategoria'}</td>
+                    <td className="txt-suave">{item.fornecedor?.nome ?? 'Sem fornecedor'}</td>
                     <td>
                       <div className="barra">
                         <span style={{ width: `${n.pct}%`, background: n.cor }} />
@@ -351,7 +351,7 @@ export default function PaginaEstoque() {
                     {a.nome}
                     {a.codigo && <span className="mono txt-suave"> · {a.codigo}</span>}
                   </td>
-                  <td>{a.fornecedor?.nome ?? <span className="txt-suave">—</span>}</td>
+                  <td>{a.fornecedor?.nome ?? <span className="txt-suave">Sem fornecedor</span>}</td>
                   <td className="direita">{a.quantidadeAtual} {a.unidade}</td>
                   <td className="direita">{a.estoqueMinimo} {a.unidade}</td>
                   <td className="direita forte" style={{ color: 'var(--vermelho)' }}>
