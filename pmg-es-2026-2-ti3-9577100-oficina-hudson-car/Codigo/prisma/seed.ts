@@ -17,13 +17,17 @@ const SENHA_PADRAO = 'oficina123'
 
 async function main() {
   console.log('› Limpando dados existentes…')
+  // Ordem de FK: filhos antes dos pais.
+  await prisma.garantiaServico.deleteMany()
+  await prisma.presencaEdicao.deleteMany()
+  await prisma.movimentacaoEstoque.deleteMany()
   await prisma.ordemServico.deleteMany()
   await prisma.itemOrcamento.deleteMany()
+  await prisma.aditivoOrcamento.deleteMany()
   await prisma.orcamento.deleteMany()
   await prisma.mecanico.deleteMany()
   await prisma.veiculo.deleteMany()
   await prisma.cliente.deleteMany()
-  await prisma.movimentacaoEstoque.deleteMany()
   await prisma.chassiCompativel.deleteMany()
   await prisma.peca.deleteMany()
   await prisma.fornecedor.deleteMany()
@@ -72,9 +76,9 @@ async function main() {
   }
 
   console.log('› Criando mecânicos…')
-  await prisma.mecanico.createMany({
-    data: [{ nome: 'José Carlos' }, { nome: 'Paulo Henrique' }, { nome: 'Anderson Silva' }],
-  })
+  const mecJose = await prisma.mecanico.create({ data: { nome: 'José Carlos' } })
+  await prisma.mecanico.create({ data: { nome: 'Paulo Henrique' } })
+  await prisma.mecanico.create({ data: { nome: 'Anderson Silva' } })
 
   console.log('› Criando fornecedores…')
   const f = {
@@ -134,12 +138,12 @@ async function main() {
     }
   }
 
-  console.log('› Criando 1 orçamento de exemplo…')
+  console.log('› Criando 1 orçamento de exemplo (aguardando)…')
   const veiculoGol = veiculosCriados[0]
   const oleo = pecasPorCodigo['OL-5W30-1L']
   const filtro = pecasPorCodigo['FI-OLEO-01']
+  const ano = new Date().getFullYear()
   if (veiculoGol && oleo && filtro) {
-    const ano = new Date().getFullYear()
     await prisma.orcamento.create({
       data: {
         numero: `ORC-${ano}-0001`,
@@ -151,13 +155,124 @@ async function main() {
         itens: {
           create: [
             // Peça entra com o preço do dia COPIADO (regra de ouro nº 3).
-            { tipo: 'PECA', pecaId: oleo.id, descricao: `${oleo.nome} (4L)`, quantidade: 4, valorUnitario: oleo.precoDia },
-            { tipo: 'PECA', pecaId: filtro.id, descricao: filtro.nome, quantidade: 1, valorUnitario: filtro.precoDia },
+            { tipo: 'PECA', pecaId: oleo.id, descricao: `${oleo.nome} (4L)`, quantidade: 4, valorUnitario: oleo.precoDia, origemPeca: 'ESTOQUE' },
+            { tipo: 'PECA', pecaId: filtro.id, descricao: filtro.nome, quantidade: 1, valorUnitario: filtro.precoDia, origemPeca: 'ESTOQUE' },
             { tipo: 'MAO_DE_OBRA', descricao: 'Mão de obra: troca de óleo e revisão', quantidade: 1, valorUnitario: 120 },
           ],
         },
       },
     })
+  }
+
+  console.log('› Criando OS em andamento (demo baixa + pendência) + aditivo autorizado…')
+  // OS do Civic: óleo e filtro têm saldo; a correia (saldo 3) pede 4 → pendência L2.
+  const veiculoCivic = veiculosCriados[1]
+  const correia = pecasPorCodigo['CO-DENT-16']
+  if (veiculoCivic && oleo && filtro && correia) {
+    const orc2 = await prisma.orcamento.create({
+      data: {
+        numero: `ORC-${ano}-0002`,
+        clienteId: veiculoCivic.clienteId,
+        veiculoId: veiculoCivic.id,
+        status: 'AUTORIZADO',
+        responsavel: 'José Carlos',
+        criadoPorId: charlles.id,
+        autorizadoEm: new Date(),
+        formaAutorizacao: 'TELEFONE',
+        itens: {
+          create: [
+            { tipo: 'PECA', pecaId: oleo.id, descricao: `${oleo.nome} (4L)`, quantidade: 4, valorUnitario: oleo.precoDia, origemPeca: 'ESTOQUE', garantiaDias: 90 },
+            { tipo: 'PECA', pecaId: filtro.id, descricao: filtro.nome, quantidade: 1, valorUnitario: filtro.precoDia, origemPeca: 'ESTOQUE' },
+            { tipo: 'PECA', pecaId: correia.id, descricao: correia.nome, quantidade: 4, valorUnitario: correia.precoDia, origemPeca: 'ESTOQUE', garantiaDias: 180 },
+            { tipo: 'MAO_DE_OBRA', descricao: 'Mão de obra: troca de correia e óleo', quantidade: 1, valorUnitario: 320 },
+          ],
+        },
+      },
+    })
+    const os2 = await prisma.ordemServico.create({
+      data: {
+        numero: `OS-${ano}-0001`,
+        orcamentoId: orc2.id,
+        clienteId: veiculoCivic.clienteId,
+        veiculoId: veiculoCivic.id,
+        mecanicoId: mecJose.id,
+        status: 'EM_ANDAMENTO',
+      },
+    })
+    // Aditivo AUTORIZADO: 1 peça de estoque (com garantia) + mão de obra extra.
+    const vela = pecasPorCodigo['VE-IGN-04']
+    if (vela) {
+      await prisma.aditivoOrcamento.create({
+        data: {
+          orcamentoId: orc2.id,
+          numero: 1,
+          status: 'AUTORIZADO',
+          observacao: 'Troca de velas identificada durante o serviço.',
+          criadoPorId: charlles.id,
+          registradoPorId: charlles.id,
+          autorizadoEm: new Date(),
+          formaAutorizacao: 'WHATSAPP',
+          itens: {
+            create: [
+              { orcamentoId: orc2.id, tipo: 'PECA', pecaId: vela.id, descricao: vela.nome, quantidade: 1, valorUnitario: vela.precoDia, origemPeca: 'ESTOQUE', garantiaDias: 90 },
+              { orcamentoId: orc2.id, tipo: 'MAO_DE_OBRA', descricao: 'Mão de obra: troca de velas', quantidade: 1, valorUnitario: 80 },
+            ],
+          },
+        },
+      })
+    }
+    void os2
+  }
+
+  console.log('› Criando 1 OS entregue com garantia…')
+  const veiculoArgo = veiculosCriados[2]
+  const velaP = pecasPorCodigo['VE-IGN-04']
+  if (veiculoArgo && velaP && oleo) {
+    const orc3 = await prisma.orcamento.create({
+      data: {
+        numero: `ORC-${ano}-0003`,
+        clienteId: veiculoArgo.clienteId,
+        veiculoId: veiculoArgo.id,
+        status: 'AUTORIZADO',
+        responsavel: 'Paulo Henrique',
+        criadoPorId: charlles.id,
+        autorizadoEm: new Date(),
+        formaAutorizacao: 'PRESENCIAL',
+        itens: {
+          create: [
+            { tipo: 'PECA', pecaId: velaP.id, descricao: velaP.nome, quantidade: 1, valorUnitario: velaP.precoDia, origemPeca: 'ESTOQUE', garantiaDias: 90 },
+            { tipo: 'MAO_DE_OBRA', descricao: 'Mão de obra: revisão elétrica', quantidade: 1, valorUnitario: 150 },
+          ],
+        },
+      },
+      include: { itens: true },
+    })
+    const entregueEm = new Date()
+    const os3 = await prisma.ordemServico.create({
+      data: {
+        numero: `OS-${ano}-0002`,
+        orcamentoId: orc3.id,
+        clienteId: veiculoArgo.clienteId,
+        veiculoId: veiculoArgo.id,
+        mecanicoId: mecJose.id,
+        status: 'ENTREGUE',
+        entregueEm,
+      },
+    })
+    // Baixa já realizada da vela (rastreável) + garantia vigente.
+    const itemVela = orc3.itens.find((it) => it.tipo === 'PECA')
+    if (itemVela) {
+      const saldo = velaP ? Math.max(0, (await prisma.peca.findUnique({ where: { id: velaP.id } }))!.quantidadeAtual - 1) : 0
+      await prisma.peca.update({ where: { id: velaP.id }, data: { quantidadeAtual: saldo } })
+      await prisma.movimentacaoEstoque.create({
+        data: { pecaId: velaP.id, ordemServicoId: os3.id, tipo: 'SAIDA', quantidade: 1, saldoResultante: saldo, motivo: `OS ${os3.numero}`, usuarioId: charlles.id },
+      })
+      await prisma.itemOrcamento.update({ where: { id: itemVela.id }, data: { baixaEstoqueEm: entregueEm } })
+      const validaAte = new Date(entregueEm.getTime() + 90 * 24 * 60 * 60 * 1000)
+      await prisma.garantiaServico.create({
+        data: { ordemServicoId: os3.id, itemOrcamentoId: itemVela.id, descricao: itemVela.descricao, prazoDias: 90, iniciaEm: entregueEm, validaAte },
+      })
+    }
   }
 
   console.log('✓ Seed concluído.')

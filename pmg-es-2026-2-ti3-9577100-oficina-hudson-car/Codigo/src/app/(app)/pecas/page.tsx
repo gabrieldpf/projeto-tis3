@@ -9,6 +9,7 @@ import {
   listarPecas,
   criarPeca,
   atualizarPrecoDia,
+  atualizarPeca,
   type PecaApi,
   ApiClientError,
 } from '@/lib/api'
@@ -252,6 +253,141 @@ function ModalNovaPeca({ onFechar, onCriada }: ModalNovaPecaProps) {
 }
 
 // -----------------------------------------------------------------------
+// Modal: Editar peça (dados cadastrais — preço do dia tem modal próprio)
+// -----------------------------------------------------------------------
+
+interface ModalEditarPecaProps {
+  peca: PecaApi
+  onFechar: () => void
+  onSalvo: (peca: PecaApi) => void
+}
+
+function ModalEditarPeca({ peca, onFechar, onSalvo }: ModalEditarPecaProps) {
+  const [nome, setNome] = useState(peca.nome)
+  const [codigo, setCodigo] = useState(peca.codigo ?? '')
+  const [categoria, setCategoria] = useState(peca.categoria)
+  const [subcategoria, setSubcategoria] = useState(peca.subcategoria ?? '')
+  const [unidade, setUnidade] = useState<string>(peca.unidade)
+  const [fornecedorId, setFornecedorId] = useState(peca.fornecedorId ?? '')
+  const [estoqueMinimo, setEstoqueMinimo] = useState(peca.estoqueMinimo.toString())
+  const [chassisTexto, setChassisTexto] = useState(
+    (peca.chassisCompativeis ?? []).map((c) => c.chassi).join('\n'),
+  )
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const primeiroRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    primeiroRef.current?.focus()
+  }, [])
+
+  async function handleSalvar() {
+    if (!nome.trim()) { setErro('Nome da peça é obrigatório.'); return }
+    if (!categoria.trim()) { setErro('Categoria é obrigatória.'); return }
+
+    const chassisList = chassisTexto
+      .split(/[\n,;]/)
+      .map((s) => s.trim().toUpperCase())
+      .filter((s) => s.length > 0)
+      .map((chassi) => ({ chassi }))
+
+    setSalvando(true)
+    setErro(null)
+    try {
+      const atualizada = await atualizarPeca(peca.id, {
+        nome: nome.trim(),
+        codigo: codigo.trim(),
+        categoria: categoria.trim(),
+        subcategoria: subcategoria.trim(),
+        unidade,
+        fornecedorId: fornecedorId.trim() || null,
+        estoqueMinimo: parseInt(estoqueMinimo, 10) || 0,
+        chassisCompativeis: chassisList,
+        version: peca.version,
+      })
+      onSalvo(atualizada)
+    } catch (e) {
+      if (e instanceof ApiClientError && e.code === 'CONFLITO') {
+        setErro('Esta peça foi alterada por outra pessoa. Recarregue e tente novamente.')
+      } else {
+        const msg = e instanceof ApiClientError ? e.message : 'Não foi possível salvar.'
+        setErro(msg)
+      }
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="titulo-editar-peca">
+      <div className="modal-box" style={{ maxWidth: 580 }}>
+        <div className="modal-head">
+          <h2 id="titulo-editar-peca">Editar peça</h2>
+          <button className="btn-fechar" onClick={onFechar} aria-label="Fechar">×</button>
+        </div>
+        <div className="modal-corpo">
+          {erro && <div className="aviso vermelho" role="alert">{erro}</div>}
+          <div className="form-grid">
+            <div className="campo-form" style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="ep-nome">Nome *</label>
+              <input ref={primeiroRef} id="ep-nome" className="input" value={nome} onChange={(e) => setNome(e.target.value)} disabled={salvando} />
+            </div>
+            <div className="campo-form">
+              <label htmlFor="ep-codigo">Código</label>
+              <input id="ep-codigo" className="input" value={codigo} onChange={(e) => setCodigo(e.target.value)} disabled={salvando} />
+            </div>
+            <div className="campo-form">
+              <label htmlFor="ep-unidade">Unidade</label>
+              <select id="ep-unidade" className="input" value={unidade} onChange={(e) => setUnidade(e.target.value)} disabled={salvando}>
+                {UNIDADES.map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <div className="campo-form">
+              <label htmlFor="ep-categoria">Categoria *</label>
+              <input id="ep-categoria" className="input" value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={salvando} />
+            </div>
+            <div className="campo-form">
+              <label htmlFor="ep-subcategoria">Subcategoria</label>
+              <input id="ep-subcategoria" className="input" value={subcategoria} onChange={(e) => setSubcategoria(e.target.value)} disabled={salvando} />
+            </div>
+            <div className="campo-form">
+              <label htmlFor="ep-fornecedor">ID do fornecedor</label>
+              <input id="ep-fornecedor" className="input" placeholder="Opcional" value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)} disabled={salvando} />
+            </div>
+            <div className="campo-form">
+              <label htmlFor="ep-minimo">Estoque mínimo</label>
+              <input id="ep-minimo" type="number" min="0" className="input" value={estoqueMinimo} onChange={(e) => setEstoqueMinimo(e.target.value)} disabled={salvando} />
+            </div>
+            <div className="campo-form" style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="ep-chassi">Chassi(s) compatíveis (um por linha, vírgula ou ponto-e-vírgula)</label>
+              <textarea
+                id="ep-chassi"
+                className="input"
+                rows={3}
+                value={chassisTexto}
+                onChange={(e) => setChassisTexto(e.target.value)}
+                disabled={salvando}
+                placeholder="Ex: 9BWZZZ377VT004251"
+                style={{ resize: 'vertical' }}
+              />
+            </div>
+          </div>
+          <p className="txt-suave" style={{ marginTop: 10 }}>
+            O preço do dia é alterado no botão <strong>&quot;Preço&quot;</strong> (endpoint próprio com auditoria).
+          </p>
+        </div>
+        <div className="modal-rodape">
+          <button className="btn secundario" onClick={onFechar} disabled={salvando}>Cancelar</button>
+          <button className="btn" onClick={handleSalvar} disabled={salvando}>
+            {salvando ? 'Salvando…' : 'Salvar alterações'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// -----------------------------------------------------------------------
 // Página principal
 // -----------------------------------------------------------------------
 
@@ -263,6 +399,7 @@ export default function PaginaPecas() {
   const [erro, setErro] = useState<string | null>(null)
 
   const [modalPreco, setModalPreco] = useState<PecaApi | null>(null)
+  const [modalEditar, setModalEditar] = useState<PecaApi | null>(null)
   const [modalNova, setModalNova] = useState(false)
 
   // Debounce da busca para não disparar request a cada tecla
@@ -301,6 +438,11 @@ export default function PaginaPecas() {
     setModalPreco(null)
   }
 
+  function handlePecaEditada(atualizada: PecaApi) {
+    setPecas((prev) => prev.map((p) => (p.id === atualizada.id ? atualizada : p)))
+    setModalEditar(null)
+  }
+
   function handlePecaCriada(nova: PecaApi) {
     // Recarrega lista para garantir ordenação correta
     setModalNova(false)
@@ -316,6 +458,13 @@ export default function PaginaPecas() {
           peca={modalPreco}
           onFechar={() => setModalPreco(null)}
           onSalvo={handlePrecoDiaSalvo}
+        />
+      )}
+      {modalEditar && (
+        <ModalEditarPeca
+          peca={modalEditar}
+          onFechar={() => setModalEditar(null)}
+          onSalvo={handlePecaEditada}
         />
       )}
       {modalNova && (
@@ -407,14 +556,24 @@ export default function PaginaPecas() {
                   <td className="direita forte">{moeda(p.precoDia)}</td>
                   <td className="txt-suave">{formatarData(p.precoDiaAtualizadoEm)}</td>
                   <td>
-                    <button
-                      className="btn secundario"
-                      style={{ padding: '6px 10px', fontSize: 13 }}
-                      onClick={() => setModalPreco(p)}
-                      aria-label={`Atualizar preço do dia de ${p.nome}`}
-                    >
-                      <IconeEditar sx={{ fontSize: 15 }} /> Preço
-                    </button>
+                    <div className="flex" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                      <button
+                        className="btn secundario"
+                        style={{ padding: '6px 10px', fontSize: 13 }}
+                        onClick={() => setModalEditar(p)}
+                        aria-label={`Editar dados da peça ${p.nome}`}
+                      >
+                        <IconeEditar sx={{ fontSize: 15 }} /> Editar
+                      </button>
+                      <button
+                        className="btn secundario"
+                        style={{ padding: '6px 10px', fontSize: 13 }}
+                        onClick={() => setModalPreco(p)}
+                        aria-label={`Atualizar preço do dia de ${p.nome}`}
+                      >
+                        <IconeEditar sx={{ fontSize: 15 }} /> Preço
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

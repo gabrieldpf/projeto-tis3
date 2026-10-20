@@ -39,9 +39,12 @@ model Usuario {
   updatedAt DateTime @updatedAt
 
   // auditoria
-  precosAtualizados Peca[]                @relation("PrecoAtualizadoPor")
-  movimentacoes     MovimentacaoEstoque[]
-  orcamentosCriados Orcamento[]           @relation("OrcamentosCriados")
+  precosAtualizados   Peca[]                @relation("PrecoAtualizadoPor")
+  movimentacoes       MovimentacaoEstoque[]
+  orcamentosCriados   Orcamento[]           @relation("OrcamentosCriados")
+  aditivosCriados     AditivoOrcamento[]    @relation("AditivosCriados")
+  aditivosRegistrados AditivoOrcamento[]    @relation("AditivosRegistrados")
+  presencas           PresencaEdicao[]      @relation("PresencasEdicao")
 }
 
 /// Fornecedores (~20 a 25). Peça é comprada sob demanda na maioria dos casos.
@@ -66,18 +69,18 @@ model Fornecedor {
 /// Peça de reposição. `precoDia` é o "preço do dia" (manual). O saldo em
 /// estoque (`quantidadeAtual`) só muda via MovimentacaoEstoque (rastreável).
 model Peca {
-  id           String  @id @default(cuid())
+  id           String      @id @default(cuid())
   nome         String
-  codigo       String? @unique
+  codigo       String?     @unique
   categoria    String
   subcategoria String?
-  unidade      String  @default("UN") // UN | L | KG | PC | ...
+  unidade      String      @default("UN") // UN | L | KG | PC | ...
   fornecedorId String?
   fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
 
   // preço do dia (manual, com auditoria — regra de ouro nº 3)
-  precoDia               Float    @default(0)
-  precoDiaAtualizadoEm   DateTime @default(now())
+  precoDia                Float    @default(0)
+  precoDiaAtualizadoEm    DateTime @default(now())
   precoDiaAtualizadoPorId String?
   precoDiaAtualizadoPor   Usuario? @relation("PrecoAtualizadoPor", fields: [precoDiaAtualizadoPorId], references: [id], onDelete: SetNull)
 
@@ -101,9 +104,9 @@ model Peca {
 /// Chassis compatíveis com a peça — habilita a BUSCA POR CHASSI, principal
 /// dor do cliente (evita comprar/instalar a peça errada).
 model ChassiCompativel {
-  id            String @id @default(cuid())
+  id            String  @id @default(cuid())
   pecaId        String
-  peca          Peca   @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+  peca          Peca    @relation(fields: [pecaId], references: [id], onDelete: Cascade)
   chassi        String
   modeloVeiculo String?
 
@@ -114,21 +117,21 @@ model ChassiCompativel {
 /// Clientes da oficina (~95% pessoa física). Dados migrados do sistema legado.
 /// `version` habilita concorrência otimista (regra de ouro nº 4).
 model Cliente {
-  id        String   @id @default(cuid())
-  nome      String
-  telefone  String?
-  documento String? // CPF/CNPJ
-  email     String?
+  id         String   @id @default(cuid())
+  nome       String
+  telefone   String?
+  documento  String? // CPF/CNPJ
+  email      String?
   observacao String?
-  desde     DateTime @default(now()) // 1º atendimento
-  ativo     Boolean  @default(true)
-  version   Int      @default(1)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  desde      DateTime @default(now()) // 1º atendimento
+  ativo      Boolean  @default(true)
+  version    Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  veiculos       Veiculo[]
-  orcamentos     Orcamento[]
-  ordensServico  OrdemServico[]
+  veiculos      Veiculo[]
+  orcamentos    Orcamento[]
+  ordensServico OrdemServico[]
 
   @@index([nome])
 }
@@ -136,10 +139,10 @@ model Cliente {
 /// Veículos vinculados a um cliente. A busca por CHASSI ajuda a achar a peça
 /// certa (prioridade nº 2). `placa` é única (não cadastrar o mesmo carro 2x).
 model Veiculo {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   clienteId String
-  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  placa     String? @unique
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  placa     String?  @unique
   chassi    String?
   marca     String?
   modelo    String?
@@ -175,25 +178,26 @@ model Mecanico {
 /// por `version` no cabeçalho e por item (regra de ouro nº 4 — edição simultânea
 /// sem perda de dados). AUTORIZADO/RECUSADO não é mais editável.
 model Orcamento {
-  id               String  @id @default(cuid())
-  numero           String  @unique
+  id               String    @id @default(cuid())
+  numero           String    @unique
   clienteId        String
-  cliente          Cliente @relation(fields: [clienteId], references: [id])
+  cliente          Cliente   @relation(fields: [clienteId], references: [id])
   veiculoId        String
-  veiculo          Veiculo @relation(fields: [veiculoId], references: [id])
-  status           String  @default("RASCUNHO") // RASCUNHO | AGUARDANDO_AUTORIZACAO | AUTORIZADO | RECUSADO
+  veiculo          Veiculo   @relation(fields: [veiculoId], references: [id])
+  status           String    @default("RASCUNHO") // RASCUNHO | AGUARDANDO_AUTORIZACAO | AUTORIZADO | RECUSADO
   observacao       String?
   responsavel      String?
   criadoPorId      String?
   criadoPor        Usuario?  @relation("OrcamentosCriados", fields: [criadoPorId], references: [id], onDelete: SetNull)
   autorizadoEm     DateTime?
   formaAutorizacao String? // PRESENCIAL | TELEFONE | WHATSAPP
-  version          Int      @default(1)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  itens         ItemOrcamento[]
-  ordemServico  OrdemServico?
+  itens        ItemOrcamento[]
+  ordemServico OrdemServico?
+  aditivos     AditivoOrcamento[]
 
   @@index([clienteId])
   @@index([veiculoId])
@@ -204,41 +208,58 @@ model Orcamento {
 /// do dia no momento em que a peça entra (nunca recalculado — regra de ouro nº 3).
 /// `version` dá controle otimista por item (2 pessoas em itens diferentes não
 /// conflitam; só o mesmo item).
+///
+/// Sprint 3: um item pode pertencer a um ADITIVO (`aditivoId`) em vez de direto
+/// ao orçamento. `origemPeca` decide se a peça baixa do estoque (ESTOQUE) ou é
+/// comprada sob demanda (COMPRA_AVULSA, ~80% do volume — não baixa). `garantiaDias`
+/// define a garantia gerada na entrega. `baixaEstoqueEm` marca a baixa já feita
+/// (idempotência — a peça só é baixada uma vez).
 model ItemOrcamento {
-  id            String    @id @default(cuid())
-  orcamentoId   String
-  orcamento     Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
-  tipo          String // PECA | MAO_DE_OBRA
-  pecaId        String?
-  peca          Peca?     @relation(fields: [pecaId], references: [id], onDelete: SetNull)
-  descricao     String
-  quantidade    Float     @default(1)
-  valorUnitario Float     @default(0)
-  version       Int       @default(1)
+  id             String            @id @default(cuid())
+  orcamentoId    String
+  orcamento      Orcamento         @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  aditivoId      String?
+  aditivo        AditivoOrcamento? @relation(fields: [aditivoId], references: [id], onDelete: Cascade)
+  tipo           String // PECA | MAO_DE_OBRA
+  pecaId         String?
+  peca           Peca?             @relation(fields: [pecaId], references: [id], onDelete: SetNull)
+  descricao      String
+  quantidade     Float             @default(1)
+  valorUnitario  Float             @default(0)
+  origemPeca     String? // ESTOQUE | COMPRA_AVULSA (nulo p/ mão de obra)
+  garantiaDias   Int?
+  baixaEstoqueEm DateTime?
+  version        Int               @default(1)
+
+  garantias GarantiaServico[]
 
   @@index([orcamentoId])
+  @@index([aditivoId])
 }
 
 /// Ordem de serviço — gerada SOMENTE a partir de um orçamento AUTORIZADO, e no
 /// máximo uma por orçamento (`orcamentoId` único). Mecânico é obrigatório.
 model OrdemServico {
-  id              String     @id @default(cuid())
-  numero          String     @unique
-  orcamentoId     String     @unique
-  orcamento       Orcamento  @relation(fields: [orcamentoId], references: [id])
+  id              String    @id @default(cuid())
+  numero          String    @unique
+  orcamentoId     String    @unique
+  orcamento       Orcamento @relation(fields: [orcamentoId], references: [id])
   clienteId       String
-  cliente         Cliente    @relation(fields: [clienteId], references: [id])
+  cliente         Cliente   @relation(fields: [clienteId], references: [id])
   veiculoId       String
-  veiculo         Veiculo    @relation(fields: [veiculoId], references: [id])
+  veiculo         Veiculo   @relation(fields: [veiculoId], references: [id])
   mecanicoId      String
-  mecanico        Mecanico   @relation(fields: [mecanicoId], references: [id])
-  status          String     @default("ABERTA") // ABERTA | EM_ANDAMENTO | AGUARDANDO_PECA | PRONTA | ENTREGUE
-  aberturaEm      DateTime   @default(now())
+  mecanico        Mecanico  @relation(fields: [mecanicoId], references: [id])
+  status          String    @default("ABERTA") // ABERTA | EM_ANDAMENTO | AGUARDANDO_PECA | PRONTA | ENTREGUE
+  aberturaEm      DateTime  @default(now())
   previsaoEntrega DateTime?
   entregueEm      DateTime?
-  version         Int        @default(1)
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  garantias     GarantiaServico[]
+  movimentacoes MovimentacaoEstoque[]
 
   @@index([clienteId])
   @@index([veiculoId])
@@ -247,18 +268,89 @@ model OrdemServico {
 
 /// Todo movimento de estoque é registrado (entrada, saída ou ajuste). Hoje o
 /// cliente perde controle porque peça instalada some do estoque sem baixa.
+/// Sprint 3: `ordemServicoId` liga a saída à OS que a gerou (baixa automática).
 model MovimentacaoEstoque {
-  id               String   @id @default(cuid())
-  pecaId           String
-  peca             Peca     @relation(fields: [pecaId], references: [id], onDelete: Cascade)
-  tipo             String // ENTRADA | SAIDA | AJUSTE
-  quantidade       Float
-  saldoResultante  Float
-  motivo           String?
-  usuarioId        String
-  usuario          Usuario  @relation(fields: [usuarioId], references: [id])
-  createdAt        DateTime @default(now())
+  id              String        @id @default(cuid())
+  pecaId          String
+  peca            Peca          @relation(fields: [pecaId], references: [id], onDelete: Cascade)
+  ordemServicoId  String?
+  ordemServico    OrdemServico? @relation(fields: [ordemServicoId], references: [id], onDelete: SetNull)
+  tipo            String // ENTRADA | SAIDA | AJUSTE
+  quantidade      Float
+  saldoResultante Float
+  motivo          String?
+  usuarioId       String
+  usuario         Usuario       @relation(fields: [usuarioId], references: [id])
+  createdAt       DateTime      @default(now())
 
   @@index([pecaId])
+  @@index([ordemServicoId])
   @@index([createdAt])
+}
+
+/// Aditivo ao orçamento (Sprint 3). O orçamento AUTORIZADO é imutável; o que
+/// muda depois entra por aqui, com número sequencial por orçamento, status e
+/// autorização próprios. Itens do aditivo só entram na OS/baixa após AUTORIZADO.
+model AditivoOrcamento {
+  id               String    @id @default(cuid())
+  orcamentoId      String
+  orcamento        Orcamento @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  numero           Int // sequencial POR orçamento (1, 2, 3…)
+  status           String    @default("RASCUNHO") // RASCUNHO | AGUARDANDO_AUTORIZACAO | AUTORIZADO | RECUSADO
+  observacao       String?
+  criadoPorId      String?
+  criadoPor        Usuario?  @relation("AditivosCriados", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  autorizadoEm     DateTime?
+  formaAutorizacao String? // PRESENCIAL | TELEFONE | WHATSAPP
+  registradoPorId  String?
+  registradoPor    Usuario?  @relation("AditivosRegistrados", fields: [registradoPorId], references: [id], onDelete: SetNull)
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  itens ItemOrcamento[]
+
+  @@unique([orcamentoId, numero])
+  @@index([orcamentoId])
+  @@index([status])
+}
+
+/// Garantia gerada por item quando a OS é ENTREGUE. `validaAte` = data de
+/// entrega + prazoDias. Sem prazo no item, não há garantia.
+model GarantiaServico {
+  id              String         @id @default(cuid())
+  ordemServicoId  String
+  ordemServico    OrdemServico   @relation(fields: [ordemServicoId], references: [id], onDelete: Cascade)
+  itemOrcamentoId String?
+  itemOrcamento   ItemOrcamento? @relation(fields: [itemOrcamentoId], references: [id], onDelete: SetNull)
+  descricao       String
+  prazoDias       Int
+  iniciaEm        DateTime // = entregueEm da OS
+  validaAte       DateTime // = iniciaEm + prazoDias
+  version         Int            @default(1)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([ordemServicoId])
+  @@index([itemOrcamentoId])
+  @@index([validaAte])
+}
+
+/// Presença de edição (Sprint 3). Heartbeat por polling: cada pessoa renova sua
+/// linha; registros com `atualizadoEm` além do TTL (45s) são purgados. Apenas
+/// informativo — NÃO bloqueia salvar (a proteção real é o controle otimista).
+model PresencaEdicao {
+  id           String   @id @default(cuid())
+  recurso      String // ORCAMENTO | ADITIVO
+  recursoId    String
+  usuarioId    String
+  usuario      Usuario  @relation("PresencasEdicao", fields: [usuarioId], references: [id], onDelete: Cascade)
+  atualizadoEm DateTime @default(now())
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([recurso, recursoId, usuarioId])
+  @@index([recurso, recursoId])
+  @@index([atualizadoEm])
 }

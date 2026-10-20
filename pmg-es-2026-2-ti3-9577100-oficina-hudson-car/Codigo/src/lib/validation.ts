@@ -4,7 +4,9 @@
 import { z } from 'zod'
 import {
   FORMAS_AUTORIZACAO,
+  ORIGEM_PECA,
   PAPEIS,
+  RECURSOS_PRESENCA,
   STATUS_OS,
   TIPOS_ITEM_ORCAMENTO,
   TIPOS_MOVIMENTACAO,
@@ -144,6 +146,10 @@ export const itemOrcamentoSchema = z.object({
   descricao: z.string().trim().min(1, 'Descrição do item é obrigatória.'),
   quantidade: z.number().positive('Quantidade deve ser maior que zero.').default(1),
   valorUnitario: z.number().nonnegative('Valor não pode ser negativo.').default(0),
+  // Sprint 3: origem da peça (ESTOQUE baixa estoque; COMPRA_AVULSA não) e
+  // garantia em dias. Opcionais p/ compatibilidade; a UI pede a escolha.
+  origemPeca: z.enum(ORIGEM_PECA).optional(),
+  garantiaDias: z.number().int().positive().optional(),
 })
 
 export const orcamentoCreateSchema = z.object({
@@ -179,6 +185,8 @@ export const itemUpdateSchema = z.object({
   descricao: z.string().trim().min(1).optional(),
   quantidade: z.number().positive('Quantidade deve ser maior que zero.').optional(),
   valorUnitario: z.number().nonnegative('Valor não pode ser negativo.').optional(),
+  origemPeca: z.enum(ORIGEM_PECA).optional(),
+  garantiaDias: z.number().int().positive().nullable().optional(),
   version: z.number().int('Versão é obrigatória para edição.'),
 })
 
@@ -207,3 +215,50 @@ export const usuarioCreateSchema = z.object({
   cargo: z.string().trim().min(1),
   papel: z.enum(PAPEIS),
 })
+
+// --- Sprint 3: Aditivo -------------------------------------------------------
+// Aditivo nasce vazio (RASCUNHO) numa OS em andamento; itens entram depois.
+export const aditivoCreateSchema = z.object({
+  observacao: z.string().trim().optional(),
+})
+export type AditivoCreateInput = z.infer<typeof aditivoCreateSchema>
+
+export const aditivoUpdateSchema = z.object({
+  observacao: z.string().trim().optional(),
+  version: z.number().int('Versão é obrigatória para edição.'),
+})
+
+// Item do aditivo = item de orçamento (reusa origemPeca/garantiaDias).
+export const itemAditivoSchema = itemOrcamentoSchema
+export const itemAditivoUpdateSchema = itemUpdateSchema
+
+// Enviar / autorizar / recusar o aditivo (mesmo ciclo do orçamento).
+export const aditivoAcaoSchema = z.object({
+  acao: z.enum(['ENVIAR', 'AUTORIZAR', 'RECUSAR']),
+  formaAutorizacao: z.enum(FORMAS_AUTORIZACAO).optional(),
+  version: z.number().int('Versão é obrigatória.'),
+})
+export type AditivoAcaoInput = z.infer<typeof aditivoAcaoSchema>
+
+// --- Sprint 3: Pendência de baixa (saldo insuficiente) -----------------------
+// Resolve um item de peça que não baixou por falta de saldo.
+export const pendenciaItemSchema = z.object({
+  acao: z.enum(['COMPRA_AVULSA', 'AJUSTE_ESTOQUE']),
+  quantidade: z.number().positive().optional(), // usado no AJUSTE_ESTOQUE
+  version: z.number().int('Versão é obrigatória para edição.'),
+})
+export type PendenciaItemInput = z.infer<typeof pendenciaItemSchema>
+
+// --- Sprint 3: Presença de edição (heartbeat) --------------------------------
+export const presencaSchema = z.object({
+  recurso: z.enum(RECURSOS_PRESENCA),
+  recursoId: z.string().trim().min(1, 'Recurso é obrigatório.'),
+})
+export type PresencaInput = z.infer<typeof presencaSchema>
+
+// --- Sprint 3: Relatórios (ADMIN) --------------------------------------------
+export const relatorioQuerySchema = z.object({
+  de: z.string().trim().optional(), // ISO yyyy-mm-dd
+  ate: z.string().trim().optional(),
+})
+export type RelatorioQueryInput = z.infer<typeof relatorioQuerySchema>

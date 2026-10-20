@@ -1,12 +1,23 @@
 // Utilitários compartilhados pelos testes de integração (banco Postgres de teste).
 import { prisma } from '@/lib/db'
+import { criarOrcamento, executarAcao } from '@/server/orcamento'
+import { criarOS } from '@/server/os'
 
 /// Limpa todas as tabelas de domínio em ordem segura de FK.
+/// Ordem: registros dependentes primeiro, entidades raiz por último.
 export async function limparTudo() {
-  await prisma.ordemServico.deleteMany()
-  await prisma.itemOrcamento.deleteMany()
-  await prisma.orcamento.deleteMany()
+  // Dependentes de GarantiaServico e PresencaEdicao primeiro
+  await prisma.garantiaServico.deleteMany()
+  await prisma.presencaEdicao.deleteMany()
+  // Movimentacoes antes de OS (FK ordemServicoId)
   await prisma.movimentacaoEstoque.deleteMany()
+  // OS antes de OrçamentoItens/Aditivo (FK orcamentoId)
+  await prisma.ordemServico.deleteMany()
+  // Itens antes de Aditivo e Orçamento (FK dupla)
+  await prisma.itemOrcamento.deleteMany()
+  // Aditivo antes de Orçamento
+  await prisma.aditivoOrcamento.deleteMany()
+  await prisma.orcamento.deleteMany()
   await prisma.chassiCompativel.deleteMany()
   await prisma.peca.deleteMany()
   await prisma.mecanico.deleteMany()
@@ -15,9 +26,15 @@ export async function limparTudo() {
   await prisma.usuario.deleteMany()
 }
 
-export function criarUsuario() {
+export function criarUsuario(over: Partial<{ nome: string; email: string; papel: string }> = {}) {
   return prisma.usuario.create({
-    data: { nome: 'Admin', email: 'admin@test.local', senhaHash: 'x', papel: 'ADMIN', cargo: 'x' },
+    data: {
+      nome: over.nome ?? 'Admin',
+      email: over.email ?? 'admin@test.local',
+      senhaHash: 'x',
+      papel: over.papel ?? 'ADMIN',
+      cargo: 'x',
+    },
   })
 }
 
@@ -44,7 +61,7 @@ export function criarMecanico(nome = 'José') {
   return prisma.mecanico.create({ data: { nome } })
 }
 
-export function criarPeca(over: Partial<{ nome: string; precoDia: number; codigo: string }> = {}) {
+export function criarPeca(over: Partial<{ nome: string; precoDia: number; codigo: string; quantidadeAtual: number; estoqueMinimo: number }> = {}) {
   return prisma.peca.create({
     data: {
       nome: over.nome ?? 'Óleo 5W30',
@@ -52,6 +69,62 @@ export function criarPeca(over: Partial<{ nome: string; precoDia: number; codigo
       categoria: 'Lubrificantes',
       unidade: 'L',
       precoDia: over.precoDia ?? 42.9,
+      quantidadeAtual: over.quantidadeAtual ?? 0,
+      estoqueMinimo: over.estoqueMinimo ?? 0,
     },
   })
+}
+
+/// Cria uma peça já com saldo em estoque (via MovimentacaoEstoque) e com
+/// a quantidade refletida em quantidadeAtual.
+export async function criarPecaComSaldo(
+  usuarioId: string,
+  over: Partial<{ nome: string; precoDia: number; quantidadeAtual: number; estoqueMinimo: number }> = {},
+) {
+  const qtd = over.quantidadeAtual ?? 10
+  const peca = await prisma.peca.create({
+    data: {
+      nome: over.nome ?? 'Filtro de Óleo',
+      categoria: 'Filtros',
+      unidade: 'UN',
+      precoDia: over.precoDia ?? 25.0,
+      quantidadeAtual: qtd,
+      estoqueMinimo: over.estoqueMinimo ?? 0,
+    },
+  })
+  // Registra a entrada inicial para manter o histórico consistente
+  await prisma.movimentacaoEstoque.create({
+    data: {
+      pecaId: peca.id,
+      tipo: 'ENTRADA',
+      quantidade: qtd,
+      saldoResultante: qtd,
+      motivo: 'Estoque inicial (teste)',
+      usuarioId,
+    },
+  })
+  return peca
+}
+
+/// Cria orçamento, autoriza e gera a OS em sequência.
+/// Retorna { orc, os } prontos para usar nos testes.
+export async function criarOrcamentoAutorizadoComOS(
+  usuarioId: string,
+  clienteId: string,
+  veiculoId: string,
+  mecanicoId: string,
+  itens: {
+    tipo: 'PECA' | 'MAO_DE_OBRA'
+    pecaId?: string
+    descricao: string
+    quantidade: number
+    valorUnitario: number
+    origemPeca?: 'ESTOQUE' | 'COMPRA_AVULSA'
+    garantiaDias?: number
+  }[] = [],
+) {
+  const orc = await criarOrcamento({ clienteId, veiculoId, itens }, usuarioId)
+  await executarAcao(orc.id, { acao: 'AUTORIZAR', formaAutorizacao: 'PRESENCIAL', version: orc.version })
+  const os = await criarOS({ orcamentoId: orc.id, mecanicoId })
+  return { orc, os }
 }

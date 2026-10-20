@@ -68,6 +68,41 @@ export const ROTULO_FORMA_AUTORIZACAO: Record<FormaAutorizacao, string> = {
   WHATSAPP: 'WhatsApp',
 }
 
+// --- Sprint 3: aditivo, origem da peça e presença de edição ------------------
+
+// Status do aditivo (mesmo ciclo do orçamento).
+export const STATUS_ADITIVO = [
+  'RASCUNHO',
+  'AGUARDANDO_AUTORIZACAO',
+  'AUTORIZADO',
+  'RECUSADO',
+] as const
+export type StatusAditivo = (typeof STATUS_ADITIVO)[number]
+
+export const ROTULO_STATUS_ADITIVO: Record<StatusAditivo, string> = {
+  RASCUNHO: 'Rascunho',
+  AGUARDANDO_AUTORIZACAO: 'Aguardando autorização',
+  AUTORIZADO: 'Autorizado',
+  RECUSADO: 'Recusado',
+}
+
+// Origem da peça de um item: baixa do estoque ou compra sob demanda.
+// ~80% do volume é COMPRA_AVULSA (não baixa estoque).
+export const ORIGEM_PECA = ['ESTOQUE', 'COMPRA_AVULSA'] as const
+export type OrigemPeca = (typeof ORIGEM_PECA)[number]
+
+export const ROTULO_ORIGEM_PECA: Record<OrigemPeca, string> = {
+  ESTOQUE: 'Baixa do estoque',
+  COMPRA_AVULSA: 'Compra avulsa',
+}
+
+// Recursos que têm presença de edição (heartbeat informativo).
+export const RECURSOS_PRESENCA = ['ORCAMENTO', 'ADITIVO'] as const
+export type RecursoPresenca = (typeof RECURSOS_PRESENCA)[number]
+
+// Tempo de vida de uma presença sem heartbeat (45s — expira e some da lista).
+export const PRESENCA_TTL_MS = 45_000
+
 // Rótulos legíveis (pt-BR) para a UI.
 export const ROTULO_PAPEL: Record<Papel, string> = {
   ADMIN: 'Administrador',
