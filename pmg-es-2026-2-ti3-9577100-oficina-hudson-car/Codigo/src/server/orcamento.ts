@@ -45,6 +45,9 @@ interface ItemEntrada {
   descricao: string
   quantidade: number
   valorUnitario: number
+  // Sprint 3: origem da peça e garantia em dias (opcionais para retrocompatibilidade)
+  origemPeca?: 'ESTOQUE' | 'COMPRA_AVULSA'
+  garantiaDias?: number
 }
 
 /// Resolve descrição/valor de um item: se for peça com `pecaId`, COPIA o preço
@@ -52,7 +55,7 @@ interface ItemEntrada {
 async function resolverItem(
   tx: Prisma.TransactionClient,
   input: ItemEntrada,
-): Promise<{ tipo: string; pecaId: string | null; descricao: string; quantidade: number; valorUnitario: number }> {
+): Promise<{ tipo: string; pecaId: string | null; descricao: string; quantidade: number; valorUnitario: number; origemPeca: string | null; garantiaDias: number | null }> {
   let { descricao, valorUnitario } = input
   let pecaId: string | null = input.pecaId ?? null
 
@@ -65,7 +68,15 @@ async function resolverItem(
     pecaId = null
   }
 
-  return { tipo: input.tipo, pecaId, descricao, quantidade: input.quantidade, valorUnitario }
+  return {
+    tipo: input.tipo,
+    pecaId,
+    descricao,
+    quantidade: input.quantidade,
+    valorUnitario,
+    origemPeca: input.origemPeca ?? null,
+    garantiaDias: input.garantiaDias ?? null,
+  }
 }
 
 /// Cria um orçamento (número sequencial gerado dentro da transação) com itens.

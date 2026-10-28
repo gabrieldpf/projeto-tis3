@@ -18,7 +18,6 @@ import {
   acaoOrcamento,
   listarClientes,
   listarVeiculos,
-  listarPecas,
   type OrcamentoApi,
   type ItemOrcamentoApi,
   type ClienteApi,
@@ -29,6 +28,9 @@ import {
 } from '@/lib/api'
 import { moeda } from '@/utils/format'
 import { BadgeOrcamento } from '@/components/Badges'
+import { SeletorPeca } from '@/components/SeletorPeca'
+import { IndicadorPresenca } from '@/components/IndicadorPresenca'
+import { usePresenca } from '@/lib/usePresenca'
 import {
   ROTULO_FORMA_AUTORIZACAO,
   FORMAS_AUTORIZACAO,
@@ -55,103 +57,6 @@ const FILTROS: { valor: string; texto: string }[] = [
   { valor: 'AUTORIZADO', texto: 'Autorizados' },
   { valor: 'RECUSADO', texto: 'Recusados' },
 ]
-
-// =======================================================================
-// Seletor de peça por CHASSI (reaproveita a busca da Sprint 1)
-// =======================================================================
-
-function SeletorPeca({
-  chassi,
-  onEscolher,
-  disabled,
-}: {
-  chassi: string | null
-  onEscolher: (p: PecaApi) => void
-  disabled?: boolean
-}) {
-  const [busca, setBusca] = useState('')
-  const [resultados, setResultados] = useState<PecaApi[]>([])
-  const [aberto, setAberto] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    if (timer.current) clearTimeout(timer.current)
-    if (!busca.trim()) {
-      setResultados([])
-      return
-    }
-    timer.current = setTimeout(async () => {
-      try {
-        const r = await listarPecas({ q: busca.trim(), chassi: chassi?.trim() || undefined })
-        setResultados(r.slice(0, 8))
-        setAberto(true)
-      } catch {
-        setResultados([])
-      }
-    }, 350)
-    return () => {
-      if (timer.current) clearTimeout(timer.current)
-    }
-  }, [busca, chassi])
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <input
-        className="input"
-        placeholder={chassi ? 'Buscar peça (filtra pelo chassi)…' : 'Buscar peça…'}
-        value={busca}
-        onChange={(e) => setBusca(e.target.value)}
-        onFocus={() => resultados.length && setAberto(true)}
-        disabled={disabled}
-        aria-label="Buscar peça"
-      />
-      {aberto && resultados.length > 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            zIndex: 20,
-            top: '100%',
-            left: 0,
-            right: 0,
-            background: '#fff',
-            border: '1px solid #e3e8ef',
-            borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,.1)',
-            maxHeight: 220,
-            overflowY: 'auto',
-          }}
-        >
-          {resultados.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className="item-dropdown"
-              onClick={() => {
-                onEscolher(p)
-                setBusca('')
-                setResultados([])
-                setAberto(false)
-              }}
-              style={{
-                display: 'block',
-                width: '100%',
-                textAlign: 'left',
-                padding: '8px 12px',
-                border: 'none',
-                borderBottom: '1px solid #f1f4f8',
-                background: 'transparent',
-                cursor: 'pointer',
-              }}
-            >
-              <strong>{p.nome}</strong>{' '}
-              <span className="txt-suave">· {moeda(p.precoDia)}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // =======================================================================
 // Modal: Novo orçamento
@@ -345,6 +250,9 @@ function PainelOrcamento({
   const [acaoPendente, setAcaoPendente] = useState(false)
   const [forma, setForma] = useState<FormaAutorizacao>('PRESENCIAL')
 
+  // O3 — presença de edição
+  const { outros } = usePresenca('ORCAMENTO', orcamentoId)
+
   const carregar = useCallback(async () => {
     setCarregando(true)
     try {
@@ -483,6 +391,8 @@ function PainelOrcamento({
             <div className="aviso vermelho">{erro ?? 'Orçamento não encontrado.'}</div>
           ) : (
             <>
+              {/* O3 — indicador de presença */}
+              <IndicadorPresenca outros={outros} />
               {erro && <div className="aviso vermelho" role="alert">{erro}</div>}
               <div className="flex" style={{ justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 12 }}>
                 <div>

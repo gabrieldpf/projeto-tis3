@@ -2,7 +2,7 @@
 // obrigatório/ativo, transições de status válidas (ENTREGUE grava data).
 import { describe, it, expect, beforeEach } from 'vitest'
 import { criarOrcamento, executarAcao } from '@/server/orcamento'
-import { criarOS, atualizarOS } from '@/server/os'
+import { criarOS, atualizarOS, marcarPronta, entregarOS } from '@/server/os'
 import { limparTudo, criarUsuario, criarCliente, criarVeiculo, criarMecanico } from './helpers'
 
 let usuarioId: string
@@ -54,21 +54,22 @@ describe('criarOS', () => {
 })
 
 describe('atualizarOS (transições)', () => {
-  it('bloqueia transição inválida (ABERTA → ENTREGUE)', async () => {
+  it('bloqueia transição inválida via atualizarOS (ABERTA → ENTREGUE)', async () => {
     const orc = await orcamentoAutorizado()
     const os = await criarOS({ orcamentoId: orc.id, mecanicoId })
+    // ENTREGUE é bloqueado diretamente pelo atualizarOS (usa endpoint dedicado)
     await expect(atualizarOS(os.id, { status: 'ENTREGUE', version: os.version })).rejects.toMatchObject({
       code: 'DADOS_INVALIDOS',
     })
   })
 
-  it('percorre o fluxo até ENTREGUE e grava entregueEm', async () => {
+  it('percorre o fluxo até ENTREGUE usando os endpoints dedicados (marcarPronta/entregarOS)', async () => {
     const orc = await orcamentoAutorizado()
     let os = await criarOS({ orcamentoId: orc.id, mecanicoId })
-    os = (await atualizarOS(os.id, { status: 'EM_ANDAMENTO', version: os.version }))!
-    os = (await atualizarOS(os.id, { status: 'PRONTA', version: os.version }))!
-    os = (await atualizarOS(os.id, { status: 'ENTREGUE', version: os.version }))!
-    expect(os.status).toBe('ENTREGUE')
-    expect(os.entregueEm).toBeTruthy()
+    os = (await atualizarOS(os.id, { status: 'EM_ANDAMENTO', version: os.version }, usuarioId))!
+    const { os: osPronta } = await marcarPronta(os.id, os.version, usuarioId)
+    const { os: osEntregue } = await entregarOS(osPronta!.id, osPronta!.version)
+    expect(osEntregue!.status).toBe('ENTREGUE')
+    expect(osEntregue!.entregueEm).toBeTruthy()
   })
 })

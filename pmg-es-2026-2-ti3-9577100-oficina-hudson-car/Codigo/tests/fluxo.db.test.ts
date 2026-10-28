@@ -2,7 +2,7 @@
 // cliente → veículo → orçamento → autorização → OS → entrega.
 import { describe, it, expect, beforeEach } from 'vitest'
 import { criarOrcamento, adicionarItem, executarAcao, totalOrcamento } from '@/server/orcamento'
-import { criarOS, atualizarOS } from '@/server/os'
+import { criarOS, atualizarOS, marcarPronta, entregarOS } from '@/server/os'
 import { limparTudo, criarUsuario, criarCliente, criarVeiculo, criarMecanico, criarPeca } from './helpers'
 
 beforeEach(limparTudo)
@@ -33,13 +33,14 @@ describe('fluxo completo', () => {
     expect(autorizado?.status).toBe('AUTORIZADO')
     expect(totalOrcamento(autorizado!.itens)).toBeCloseTo(4 * 42.9 + 120, 2)
 
-    // 3) Gera a OS e leva até a entrega.
+    // 3) Gera a OS e leva até a entrega via endpoints dedicados (Sprint 3).
     let os = await criarOS({ orcamentoId: orc.id, mecanicoId: mecanico.id, previsaoEntrega: '2026-10-20' })
     expect(os.orcamentoId).toBe(orc.id)
-    os = (await atualizarOS(os.id, { status: 'EM_ANDAMENTO', version: os.version }))!
-    os = (await atualizarOS(os.id, { status: 'PRONTA', version: os.version }))!
-    os = (await atualizarOS(os.id, { status: 'ENTREGUE', version: os.version }))!
-    expect(os.status).toBe('ENTREGUE')
-    expect(os.entregueEm).toBeTruthy()
+    os = (await atualizarOS(os.id, { status: 'EM_ANDAMENTO', version: os.version }, usuario.id))!
+    // Sprint 3: PRONTA e ENTREGUE exigem funções dedicadas (baixa estoque + garantias).
+    const { os: osPronta } = await marcarPronta(os.id, os.version, usuario.id)
+    const { os: osEntregue } = await entregarOS(osPronta!.id, osPronta!.version)
+    expect(osEntregue!.status).toBe('ENTREGUE')
+    expect(osEntregue!.entregueEm).toBeTruthy()
   })
 })

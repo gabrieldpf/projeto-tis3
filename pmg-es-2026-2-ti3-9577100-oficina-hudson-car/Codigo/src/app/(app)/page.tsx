@@ -1,5 +1,6 @@
 'use client'
-// Início / Dashboard.
+// Início / Dashboard — Sprint 3 (N4).
+// N4: cards "Aditivos aguardando autorização" e "Prontas para entrega".
 // Os cards financeiros só são renderizados para o admin (regra de ouro nº 2).
 
 import { useEffect, useState } from 'react'
@@ -15,17 +16,21 @@ import {
   IconeDinheiro,
   IconeVeiculo,
   IconeAlerta,
+  IconeGarantia,
 } from '@/components/icons'
 import {
   listarOrdensServico,
   listarOrcamentos,
   listarAlertas,
+  listarAditivos,
   type OrdemServicoApi,
   type OrcamentoApi,
   type AlertaCompraApi,
+  type AditivoApi,
   ApiClientError,
 } from '@/lib/api'
-import type { StatusOS, StatusOrcamento } from '@/lib/constants'
+import type { StatusOS, StatusOrcamento, StatusAditivo } from '@/lib/constants'
+import { ROTULO_STATUS_ADITIVO } from '@/lib/constants'
 
 export default function PaginaInicio() {
   const { usuario, ehAdmin } = useAuth()
@@ -33,6 +38,7 @@ export default function PaginaInicio() {
   const [osAtivas, setOsAtivas] = useState<OrdemServicoApi[]>([])
   const [aguardandoAutorizacao, setAguardandoAutorizacao] = useState<OrcamentoApi[]>([])
   const [alertas, setAlertas] = useState<AlertaCompraApi[]>([])
+  const [aditivosPendentes, setAditivosPendentes] = useState<AditivoApi[]>([])
   const [carregando, setCarregando] = useState(true)
 
   useEffect(() => {
@@ -40,7 +46,7 @@ export default function PaginaInicio() {
 
     async function carregar() {
       setCarregando(true)
-      const [todasOS, orcamentosPendentes, alertasEstoque] = await Promise.all([
+      const [todasOS, orcamentosPendentes, alertasEstoque, aditivos] = await Promise.all([
         listarOrdensServico({}).catch((err) => {
           if (!(err instanceof ApiClientError)) console.error(err)
           return [] as OrdemServicoApi[]
@@ -53,6 +59,7 @@ export default function PaginaInicio() {
           if (!(err instanceof ApiClientError)) console.error(err)
           return [] as AlertaCompraApi[]
         }),
+        listarAditivos({ status: 'AGUARDANDO_AUTORIZACAO' }).catch(() => [] as AditivoApi[]),
       ])
 
       if (cancelado) return
@@ -60,6 +67,7 @@ export default function PaginaInicio() {
       setOsAtivas(todasOS.filter((os) => os.status !== 'ENTREGUE'))
       setAguardandoAutorizacao(orcamentosPendentes)
       setAlertas(alertasEstoque)
+      setAditivosPendentes(aditivos)
       setCarregando(false)
     }
 
@@ -69,6 +77,9 @@ export default function PaginaInicio() {
       cancelado = true
     }
   }, [])
+
+  // N4 — OS com status PRONTA (derivado das já carregadas).
+  const osProntas = osAtivas.filter((os) => os.status === 'PRONTA')
 
   return (
     <>
@@ -97,7 +108,7 @@ export default function PaginaInicio() {
             <IconeEstoque fontSize="small" /> Alertas de compra
           </div>
           <div className="valor">{carregando ? '…' : alertas.length}</div>
-          <div className="sub">itens no/abaixo do mínimo</div>
+          <div className="sub">inclui itens abaixo do mínimo após baixas de OS</div>
         </div>
 
         {/* Card financeiro — SOMENTE ADMIN (regra de ouro nº 2) */}
@@ -125,6 +136,120 @@ export default function PaginaInicio() {
           </div>
         )}
       </div>
+
+      {/* N4 — Prontas para entrega */}
+      {(!carregando && osProntas.length > 0) && (
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h2>
+                <IconeGarantia sx={{ fontSize: 18, verticalAlign: '-3px', color: 'var(--verde)' }} />{' '}
+                Prontas para entrega
+              </h2>
+              <p>OS concluídas — aguardando retirada pelo cliente</p>
+            </div>
+            <Link href="/ordens-servico" className="btn secundario">
+              Ver todas
+            </Link>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>OS</th>
+                <th>Veículo</th>
+                <th>Responsável</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {osProntas.map((os) => (
+                <tr key={os.id}>
+                  <td className="mono forte">{os.numero}</td>
+                  <td>
+                    {os.veiculo?.marca} {os.veiculo?.modelo}
+                    {os.veiculo?.placa ? (
+                      <> · <span className="mono">{os.veiculo.placa}</span></>
+                    ) : null}
+                  </td>
+                  <td>{os.mecanico?.nome ?? 'A definir'}</td>
+                  <td>
+                    <BadgeOS status={os.status as StatusOS} />
+                  </td>
+                  <td>
+                    <Link
+                      href={`/ordens-servico?os=${os.id}`}
+                      className="btn secundario"
+                      style={{ padding: '4px 10px', fontSize: 13 }}
+                      aria-label={`Abrir OS ${os.numero}`}
+                    >
+                      Abrir
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* N4 — Aditivos aguardando autorização */}
+      {(!carregando && aditivosPendentes.length > 0) && (
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h2>Aditivos aguardando autorização</h2>
+              <p>Serviços extras adicionados às OS em andamento</p>
+            </div>
+            <Link href="/ordens-servico" className="btn secundario">
+              Ver OS
+            </Link>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Aditivo</th>
+                <th>Orçamento</th>
+                <th>OS</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {aditivosPendentes.map((adi) => (
+                <tr key={adi.id}>
+                  <td className="mono forte">Aditivo #{adi.numero}</td>
+                  <td className="mono">
+                    {adi.orcamento?.numero ?? '—'}
+                  </td>
+                  <td className="mono">
+                    {adi.orcamento?.ordemServico?.numero ?? '—'}
+                  </td>
+                  <td>
+                    <span className="badge amarelo">
+                      {ROTULO_STATUS_ADITIVO[adi.status as StatusAditivo]}
+                    </span>
+                  </td>
+                  <td>
+                    {adi.orcamento?.ordemServico?.id ? (
+                      <Link
+                        href={`/ordens-servico?os=${adi.orcamento.ordemServico.id}`}
+                        className="btn secundario"
+                        style={{ padding: '4px 10px', fontSize: 13 }}
+                        aria-label={`Abrir OS do Aditivo #${adi.numero}`}
+                      >
+                        Ver OS
+                      </Link>
+                    ) : (
+                      <span className="txt-suave">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Orçamentos aguardando autorização */}
       <div className="card">

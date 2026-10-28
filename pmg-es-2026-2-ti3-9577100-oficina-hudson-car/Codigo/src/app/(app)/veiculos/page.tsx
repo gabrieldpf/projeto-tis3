@@ -1,18 +1,22 @@
 'use client'
 // Veículos com detalhe por veículo e fotos de entrada/saída
 // (evita disputa de arranhão após a lavagem). Integrado à API real.
-// Cada veículo pertence a um cliente (busca por placa/chassi — prioridade nº 2).
+// N2: abas "Dados" / "Histórico & Garantias" no PainelDetalhe.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import {
   listarVeiculos,
   listarClientes,
   criarVeiculo,
   atualizarVeiculo,
   obterVeiculo,
+  obterHistoricoVeiculo,
   type VeiculoApi,
   type VeiculoDetalheApi,
   type ClienteApi,
+  type HistoricoVeiculoApi,
+  type GarantiaApi,
   ApiClientError,
 } from '@/lib/api'
 import {
@@ -21,6 +25,7 @@ import {
   IconeFoto,
   IconeVeiculo,
   IconeEditar,
+  IconeGarantia,
 } from '@/components/icons'
 import { BadgeOrcamento, BadgeOS } from '@/components/Badges'
 import { moeda } from '@/utils/format'
@@ -40,7 +45,7 @@ function formatarData(iso: string | null | undefined): string {
 // -----------------------------------------------------------------------
 
 interface ModalVeiculoProps {
-  veiculo?: VeiculoApi // undefined = criação
+  veiculo?: VeiculoApi
   clientes: ClienteApi[]
   onFechar: () => void
   onSalvo: (v: VeiculoApi) => void
@@ -126,7 +131,6 @@ function ModalVeiculo({ veiculo, clientes, onFechar, onSalvo }: ModalVeiculoProp
         <div className="modal-corpo">
           {erro && <div className="aviso vermelho" role="alert">{erro}</div>}
 
-          {/* Seletor de cliente apenas na criação */}
           {!edicao && (
             <>
               {clientes.length === 0 && (
@@ -222,9 +226,7 @@ function ModalVeiculo({ veiculo, clientes, onFechar, onSalvo }: ModalVeiculoProp
           </div>
         </div>
         <div className="modal-rodape">
-          <button className="btn secundario" onClick={onFechar} disabled={salvando}>
-            Cancelar
-          </button>
+          <button className="btn secundario" onClick={onFechar} disabled={salvando}>Cancelar</button>
           <button
             className="btn"
             onClick={handleSalvar}
@@ -239,8 +241,145 @@ function ModalVeiculo({ veiculo, clientes, onFechar, onSalvo }: ModalVeiculoProp
 }
 
 // -----------------------------------------------------------------------
+// N2 — Aba Histórico & Garantias
+// -----------------------------------------------------------------------
+
+function AbaHistorico({ veiculoId }: { veiculoId: string }) {
+  const [historico, setHistorico] = useState<HistoricoVeiculoApi | null>(null)
+  const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState<string | null>(null)
+
+  useEffect(() => {
+    setCarregando(true)
+    setErro(null)
+    obterHistoricoVeiculo(veiculoId)
+      .then(setHistorico)
+      .catch((e) => {
+        const msg = e instanceof ApiClientError ? e.message : 'Erro ao carregar histórico.'
+        setErro(msg)
+      })
+      .finally(() => setCarregando(false))
+  }, [veiculoId])
+
+  if (carregando) {
+    return <div className="carregando">Carregando histórico…</div>
+  }
+  if (erro) {
+    return <div className="aviso vermelho" role="alert">{erro}</div>
+  }
+  if (!historico) return null
+
+  const { garantiasVigentes, ordensEntregues } = historico
+
+  return (
+    <div>
+      {/* Garantias vigentes */}
+      <div className="card" style={{ margin: '0 0 16px' }}>
+        <div className="card-head">
+          <div>
+            <h2>
+              <IconeGarantia sx={{ fontSize: 18, verticalAlign: '-3px' }} /> Garantias vigentes
+            </h2>
+            <p>{garantiasVigentes.length} garantia{garantiasVigentes.length !== 1 ? 's' : ''} ativa{garantiasVigentes.length !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        {garantiasVigentes.length === 0 ? (
+          <div className="card-body">
+            <p className="txt-suave">Nenhuma garantia vigente para este veículo.</p>
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Válida até</th>
+              </tr>
+            </thead>
+            <tbody>
+              {garantiasVigentes.map((g: GarantiaApi) => (
+                <tr key={g.id}>
+                  <td>{g.descricao}</td>
+                  <td>
+                    <span
+                      className="badge verde"
+                      aria-label={`Garantia até ${formatarData(g.validaAte)}`}
+                    >
+                      <IconeGarantia sx={{ fontSize: 13, verticalAlign: '-2px' }} />{' '}
+                      Garantia até {formatarData(g.validaAte)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* OS entregues */}
+      <div className="card" style={{ margin: 0 }}>
+        <div className="card-head">
+          <div>
+            <h2>OS entregues</h2>
+            <p>{ordensEntregues.length} OS{ordensEntregues.length !== 1 ? 's' : ''} finalizada{ordensEntregues.length !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        {ordensEntregues.length === 0 ? (
+          <div className="card-body">
+            <p className="txt-suave">Nenhuma OS entregue para este veículo.</p>
+          </div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Número</th>
+                <th>Entregue em</th>
+                <th>Mecânico</th>
+                <th className="direita">Total</th>
+                <th>Garantias</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {ordensEntregues.map((os) => (
+                <tr key={os.id}>
+                  <td className="mono forte">{os.numero}</td>
+                  <td>{formatarData(os.entregueEm)}</td>
+                  <td>{os.mecanico?.nome ?? <span className="txt-suave">—</span>}</td>
+                  <td className="direita forte">{moeda(os.totalServico)}</td>
+                  <td>
+                    {os.garantias.filter((g: GarantiaApi) => g.vigente).length > 0 ? (
+                      <span className="badge verde">
+                        {os.garantias.filter((g: GarantiaApi) => g.vigente).length} vigente{os.garantias.filter((g: GarantiaApi) => g.vigente).length !== 1 ? 's' : ''}
+                      </span>
+                    ) : (
+                      <span className="txt-suave">—</span>
+                    )}
+                  </td>
+                  <td>
+                    <Link
+                      href={`/ordens-servico?os=${os.id}`}
+                      className="btn secundario"
+                      style={{ padding: '4px 10px', fontSize: 13 }}
+                      aria-label={`Ver OS ${os.numero}`}
+                    >
+                      Ver OS
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// -----------------------------------------------------------------------
 // Painel de detalhe do veículo selecionado
 // -----------------------------------------------------------------------
+
+type AbaDetalhe = 'dados' | 'historico'
 
 interface PainelDetalheProps {
   veiculo: VeiculoApi
@@ -251,20 +390,40 @@ function PainelDetalhe({ veiculo, onEditar }: PainelDetalheProps) {
   const [detalhe, setDetalhe] = useState<VeiculoDetalheApi | null>(null)
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false)
   const [erroDetalhe, setErroDetalhe] = useState<string | null>(null)
+  const [aba, setAba] = useState<AbaDetalhe>('dados')
 
   useEffect(() => {
     setDetalhe(null)
     setErroDetalhe(null)
-    setCarregandoDetalhe(true)
+    setAba('dados')
 
-    obterVeiculo(veiculo.id)
-      .then(setDetalhe)
-      .catch((e) => {
-        const msg = e instanceof ApiClientError ? e.message : 'Erro ao carregar histórico.'
-        setErroDetalhe(msg)
-      })
-      .finally(() => setCarregandoDetalhe(false))
+    if (aba === 'dados') {
+      setCarregandoDetalhe(true)
+      obterVeiculo(veiculo.id)
+        .then(setDetalhe)
+        .catch((e) => {
+          const msg = e instanceof ApiClientError ? e.message : 'Erro ao carregar histórico.'
+          setErroDetalhe(msg)
+        })
+        .finally(() => setCarregandoDetalhe(false))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [veiculo.id])
+
+  function trocarAba(novaAba: AbaDetalhe) {
+    setAba(novaAba)
+    // Carrega detalhe de orçamentos/OS ao entrar na aba Dados
+    if (novaAba === 'dados' && !detalhe && !carregandoDetalhe) {
+      setCarregandoDetalhe(true)
+      obterVeiculo(veiculo.id)
+        .then(setDetalhe)
+        .catch((e) => {
+          const msg = e instanceof ApiClientError ? e.message : 'Erro ao carregar histórico.'
+          setErroDetalhe(msg)
+        })
+        .finally(() => setCarregandoDetalhe(false))
+    }
+  }
 
   return (
     <div>
@@ -289,165 +448,216 @@ function PainelDetalhe({ veiculo, onEditar }: PainelDetalheProps) {
             <IconeEditar sx={{ fontSize: 15 }} /> Editar
           </button>
         </div>
-        <div className="card-body">
-          <div className="def-grid">
-            <div className="item">
-              <div className="rotulo">Placa</div>
-              <div className="valor mono">{veiculo.placa ?? 'Não informada'}</div>
-            </div>
-            <div className="item">
-              <div className="rotulo">Chassi</div>
-              <div className="valor mono">{veiculo.chassi ?? 'Não informado'}</div>
-            </div>
-            <div className="item">
-              <div className="rotulo">Ano</div>
-              <div className="valor">{veiculo.ano ?? 'Não informado'}</div>
-            </div>
-            <div className="item">
-              <div className="rotulo">Cor</div>
-              <div className="valor">{veiculo.cor ?? 'Não informada'}</div>
+
+        {/* N2 — Seletor de abas */}
+        <div
+          role="tablist"
+          aria-label="Seções do veículo"
+          className="flex"
+          style={{ padding: '0 20px 0', borderBottom: '1px solid var(--cinza-borda)', gap: 4 }}
+        >
+          <button
+            role="tab"
+            className={`btn ${aba === 'dados' ? '' : 'secundario'}`}
+            style={{ borderRadius: '8px 8px 0 0', fontSize: 13 }}
+            onClick={() => trocarAba('dados')}
+            aria-selected={aba === 'dados'}
+          >
+            Dados
+          </button>
+          <button
+            role="tab"
+            className={`btn ${aba === 'historico' ? '' : 'secundario'}`}
+            style={{ borderRadius: '8px 8px 0 0', fontSize: 13 }}
+            onClick={() => trocarAba('historico')}
+            aria-selected={aba === 'historico'}
+          >
+            Histórico &amp; Garantias
+          </button>
+        </div>
+
+        {aba === 'dados' && (
+          <div className="card-body">
+            <div className="def-grid">
+              <div className="item">
+                <div className="rotulo">Placa</div>
+                <div className="valor mono">{veiculo.placa ?? 'Não informada'}</div>
+              </div>
+              <div className="item">
+                <div className="rotulo">Chassi</div>
+                <div className="valor mono">{veiculo.chassi ?? 'Não informado'}</div>
+              </div>
+              <div className="item">
+                <div className="rotulo">Ano</div>
+                <div className="valor">{veiculo.ano ?? 'Não informado'}</div>
+              </div>
+              <div className="item">
+                <div className="rotulo">Cor</div>
+                <div className="valor">{veiculo.cor ?? 'Não informada'}</div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Fotos de entrada/saída */}
-      <div className="card">
-        <div className="card-head">
-          <div>
-            <h2>
-              <IconeFoto sx={{ fontSize: 18, verticalAlign: '-3px' }} /> Fotos de
-              entrada / saída
-            </h2>
-            <p>Registro do estado do veículo (evita disputas)</p>
-          </div>
-        </div>
-        <div className="card-body">
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {['Entrada · frente', 'Entrada · lateral', 'Saída · frente', 'Saída · lavado'].map(
-              (legenda) => (
-                <div key={legenda} style={{ width: 140, textAlign: 'center' }}>
-                  <div
-                    style={{
-                      height: 96,
-                      borderRadius: 8,
-                      background:
-                        'repeating-linear-gradient(45deg,#eef1f5,#eef1f5 8px,#e3e8ef 8px,#e3e8ef 16px)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      color: '#94a3b8',
-                    }}
-                  >
-                    <IconeVeiculo sx={{ fontSize: 40 }} />
-                  </div>
-                  <span className="txt-suave" style={{ fontSize: 12 }}>
-                    {legenda}
-                  </span>
-                </div>
-              ),
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Orçamentos e OS — dados reais */}
-      {carregandoDetalhe && (
-        <div className="card">
-          <div className="carregando">Carregando histórico…</div>
+      {/* Aba Histórico & Garantias */}
+      {aba === 'historico' && (
+        <div style={{ marginTop: 16 }}>
+          <AbaHistorico veiculoId={veiculo.id} />
         </div>
       )}
 
-      {erroDetalhe && (
-        <div className="aviso vermelho" style={{ margin: '0 0 16px' }} role="alert">
-          {erroDetalhe}
-        </div>
-      )}
-
-      {detalhe && (
+      {aba === 'dados' && (
         <>
-          {/* Orçamentos */}
+          {/* Fotos de entrada/saída */}
           <div className="card">
             <div className="card-head">
               <div>
-                <h2>Orçamentos do veículo</h2>
-                <p>{detalhe.orcamentos.length} orçamento{detalhe.orcamentos.length !== 1 ? 's' : ''}</p>
+                <h2>
+                  <IconeFoto sx={{ fontSize: 18, verticalAlign: '-3px' }} /> Fotos de
+                  entrada / saída
+                </h2>
+                <p>Registro do estado do veículo (evita disputas)</p>
               </div>
             </div>
-            {detalhe.orcamentos.length === 0 ? (
-              <div className="card-body">
-                <p className="txt-suave">Nenhum orçamento para este veículo.</p>
+            <div className="card-body">
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {['Entrada · frente', 'Entrada · lateral', 'Saída · frente', 'Saída · lavado'].map(
+                  (legenda) => (
+                    <div key={legenda} style={{ width: 140, textAlign: 'center' }}>
+                      <div
+                        style={{
+                          height: 96,
+                          borderRadius: 8,
+                          background:
+                            'repeating-linear-gradient(45deg,#eef1f5,#eef1f5 8px,#e3e8ef 8px,#e3e8ef 16px)',
+                          display: 'grid',
+                          placeItems: 'center',
+                          color: '#94a3b8',
+                        }}
+                      >
+                        <IconeVeiculo sx={{ fontSize: 40 }} />
+                      </div>
+                      <span className="txt-suave" style={{ fontSize: 12 }}>
+                        {legenda}
+                      </span>
+                    </div>
+                  ),
+                )}
               </div>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Número</th>
-                    <th>Data</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detalhe.orcamentos.map((orc) => {
-                    const total = orc.itens.reduce(
-                      (soma, item) => soma + item.quantidade * item.valorUnitario,
-                      0,
-                    )
-                    return (
-                      <tr key={orc.id}>
-                        <td className="mono forte">{orc.numero}</td>
-                        <td className="txt-suave">{formatarData(orc.createdAt)}</td>
-                        <td>
-                          <BadgeOrcamento status={orc.status as StatusOrcamento} />
-                        </td>
-                        <td style={{ textAlign: 'right' }} className="mono">
-                          {moeda(total)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
+            </div>
           </div>
 
-          {/* Ordens de serviço */}
-          <div className="card">
-            <div className="card-head">
-              <div>
-                <h2>Ordens de serviço</h2>
-                <p>{detalhe.ordensServico.length} OS{detalhe.ordensServico.length !== 1 ? 's' : ''}</p>
-              </div>
+          {/* Orçamentos e OS — dados reais */}
+          {carregandoDetalhe && (
+            <div className="card">
+              <div className="carregando">Carregando histórico…</div>
             </div>
-            {detalhe.ordensServico.length === 0 ? (
-              <div className="card-body">
-                <p className="txt-suave">Nenhuma OS para este veículo.</p>
+          )}
+
+          {erroDetalhe && (
+            <div className="aviso vermelho" style={{ margin: '0 0 16px' }} role="alert">
+              {erroDetalhe}
+            </div>
+          )}
+
+          {detalhe && (
+            <>
+              {/* Orçamentos */}
+              <div className="card">
+                <div className="card-head">
+                  <div>
+                    <h2>Orçamentos do veículo</h2>
+                    <p>
+                      {detalhe.orcamentos.length} orçamento
+                      {detalhe.orcamentos.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                {detalhe.orcamentos.length === 0 ? (
+                  <div className="card-body">
+                    <p className="txt-suave">Nenhum orçamento para este veículo.</p>
+                  </div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Número</th>
+                        <th>Data</th>
+                        <th>Status</th>
+                        <th style={{ textAlign: 'right' }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detalhe.orcamentos.map((orc) => {
+                        const total = orc.itens.reduce(
+                          (soma, item) => soma + item.quantidade * item.valorUnitario,
+                          0,
+                        )
+                        return (
+                          <tr key={orc.id}>
+                            <td className="mono forte">{orc.numero}</td>
+                            <td className="txt-suave">{formatarData(orc.createdAt)}</td>
+                            <td>
+                              <BadgeOrcamento status={orc.status as StatusOrcamento} />
+                            </td>
+                            <td style={{ textAlign: 'right' }} className="mono">
+                              {moeda(total)}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Número</th>
-                    <th>Mecânico</th>
-                    <th>Previsão</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detalhe.ordensServico.map((os) => (
-                    <tr key={os.id}>
-                      <td className="mono forte">{os.numero}</td>
-                      <td>{os.mecanico?.nome ?? <span className="txt-suave">Não definido</span>}</td>
-                      <td className="txt-suave">{formatarData(os.previsaoEntrega)}</td>
-                      <td>
-                        <BadgeOS status={os.status as StatusOS} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+
+              {/* Ordens de serviço */}
+              <div className="card">
+                <div className="card-head">
+                  <div>
+                    <h2>Ordens de serviço</h2>
+                    <p>
+                      {detalhe.ordensServico.length} OS
+                      {detalhe.ordensServico.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                {detalhe.ordensServico.length === 0 ? (
+                  <div className="card-body">
+                    <p className="txt-suave">Nenhuma OS para este veículo.</p>
+                  </div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Número</th>
+                        <th>Mecânico</th>
+                        <th>Previsão</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detalhe.ordensServico.map((os) => (
+                        <tr key={os.id}>
+                          <td className="mono forte">{os.numero}</td>
+                          <td>
+                            {os.mecanico?.nome ?? (
+                              <span className="txt-suave">Não definido</span>
+                            )}
+                          </td>
+                          <td className="txt-suave">{formatarData(os.previsaoEntrega)}</td>
+                          <td>
+                            <BadgeOS status={os.status as StatusOS} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
@@ -485,7 +695,6 @@ export default function PaginaVeiculos() {
     }
   }, [])
 
-  // Lista de clientes p/ o seletor do modal (carrega uma vez).
   useEffect(() => {
     void listarClientes().then(setClientes).catch(() => {})
   }, [])
