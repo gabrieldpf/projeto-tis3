@@ -331,13 +331,21 @@ export interface PresencaApi {
   atualizadoEm: string
 }
 
-// Relatório financeiro (ADMIN) — mesma forma do mock antigo.
+// Relatório financeiro (ADMIN). `serie` é o comparativo nº de carros ×
+// faturamento por mês (RF11 — eixos NÃO proporcionais). Sprint 4 (S1): aceita
+// filtro por período (de/ate) e devolve totais do período + variação vs. o
+// período anterior de igual duração (`variacao.*` = null quando não há base).
 export interface RelatorioFinanceiroApi {
   faturamentoMes: number
   faturamentoMesAnterior: number
   ticketMedio: number
   aReceber: number
   serie: { periodo: string; carros: number; faturamento: number }[]
+  periodo: { de: string | null; ate: string | null }
+  totalCarros: number
+  totalFaturamento: number
+  ticketMedioPeriodo: number
+  variacao: { carros: number | null; faturamento: number | null }
 }
 
 // Foto do veículo (Sprint 4 — RF10). `url` é a URL assinada temporária de
