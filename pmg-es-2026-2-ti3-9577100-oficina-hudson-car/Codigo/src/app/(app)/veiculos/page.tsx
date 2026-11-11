@@ -735,7 +735,7 @@ export default function PaginaVeiculos() {
       ) : erro ? (
         <div className="aviso vermelho" style={{ margin: 16 }}>{erro}</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: 22 }}>
+        <div className="grid-mestre-detalhe">
           {/* Lista de veículos */}
           <div className="card" style={{ margin: 0 }}>
             <table>
