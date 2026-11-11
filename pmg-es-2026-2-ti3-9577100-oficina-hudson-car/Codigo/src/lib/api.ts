@@ -340,6 +340,21 @@ export interface RelatorioFinanceiroApi {
   serie: { periodo: string; carros: number; faturamento: number }[]
 }
 
+// Foto do veículo (Sprint 4 — RF10). `url` é a URL assinada temporária de
+// leitura (bucket privado); pode vir null se o storage estiver indisponível.
+export interface FotoApi {
+  id: string
+  veiculoId: string
+  ordemServicoId: string | null
+  momento: 'ENTRADA' | 'SAIDA'
+  path: string
+  legenda: string | null
+  criadoPorId: string | null
+  version: number
+  createdAt: string
+  url: string | null
+}
+
 // Funções de acesso à API --------------------------------------------------------
 
 // --- Fornecedores ---
@@ -767,4 +782,30 @@ export function obterRelatorioFinanceiro(params?: { de?: string; ate?: string })
   if (params?.ate) sp.set('ate', params.ate)
   const qs = sp.toString()
   return executar<RelatorioFinanceiroApi>(`/api/relatorios${qs ? `?${qs}` : ''}`)
+}
+
+// --- Fotos do veículo (RF10 · Q1/R1/R2) ---
+
+export function listarFotos(veiculoId: string, momento?: 'ENTRADA' | 'SAIDA'): Promise<FotoApi[]> {
+  const qs = momento ? `?momento=${momento}` : ''
+  return executar<FotoApi[]>(`/api/veiculos/${veiculoId}/fotos${qs}`)
+}
+
+// Upload de UMA foto. Usa multipart/form-data — NÃO definimos Content-Type à
+// mão (o browser põe o boundary). O cookie de sessão vai junto (credentials).
+export function enviarFoto(
+  veiculoId: string,
+  arquivo: File,
+  dados: { momento: 'ENTRADA' | 'SAIDA'; ordemServicoId?: string; legenda?: string },
+): Promise<FotoApi> {
+  const form = new FormData()
+  form.append('arquivo', arquivo)
+  form.append('momento', dados.momento)
+  if (dados.ordemServicoId) form.append('ordemServicoId', dados.ordemServicoId)
+  if (dados.legenda) form.append('legenda', dados.legenda)
+  return executar<FotoApi>(`/api/veiculos/${veiculoId}/fotos`, { method: 'POST', body: form })
+}
+
+export function removerFoto(id: string): Promise<{ ok: boolean }> {
+  return executar<{ ok: boolean }>(`/api/fotos/${id}`, { method: 'DELETE' })
 }
