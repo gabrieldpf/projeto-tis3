@@ -32,6 +32,7 @@ import {
 } from '@/lib/api'
 import { BadgeOS } from '@/components/Badges'
 import { PainelAditivo } from '@/components/PainelAditivo'
+import { FotosVeiculo } from '@/components/FotosVeiculo'
 import {
   ROTULO_STATUS_OS,
   TRANSICOES_OS,
@@ -943,6 +944,19 @@ function PainelOS({ osId, mecanicos, onFechar, onAtualizada }: PainelOSProps) {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* R2 — Fotos da entrega (SAÍDA): carro lavado na entrega do veículo */}
+            {(atual.status === 'PRONTA' || atual.status === 'ENTREGUE') && (
+              <div style={{ marginTop: 16 }}>
+                <FotosVeiculo
+                  veiculoId={atual.veiculoId}
+                  ordemServicoId={atual.id}
+                  momentos={['SAIDA']}
+                  titulo="Fotos da entrega"
+                  descricao="Fotografe o carro lavado na entrega (compare com a entrada na tela do veículo)"
+                />
               </div>
             )}
           </div>
