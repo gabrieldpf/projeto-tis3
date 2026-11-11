@@ -4,6 +4,7 @@
 import { z } from 'zod'
 import {
   FORMAS_AUTORIZACAO,
+  MOMENTOS_FOTO,
   ORIGEM_PECA,
   PAPEIS,
   RECURSOS_PRESENCA,
@@ -262,3 +263,19 @@ export const relatorioQuerySchema = z.object({
   ate: z.string().trim().optional(),
 })
 export type RelatorioQueryInput = z.infer<typeof relatorioQuerySchema>
+
+// --- Sprint 4: Fotos do veículo (RF10) ---------------------------------------
+// Metadados que acompanham o upload (vêm como campos do multipart, não JSON).
+// O arquivo em si é validado na rota (mime/tamanho — ver constants).
+export const fotoCreateSchema = z.object({
+  momento: z.enum(MOMENTOS_FOTO),
+  ordemServicoId: z.string().trim().min(1).optional(),
+  legenda: z.string().trim().max(200, 'Legenda muito longa (máx. 200).').optional(),
+})
+export type FotoCreateInput = z.infer<typeof fotoCreateSchema>
+
+// Filtro de listagem: ?momento=ENTRADA|SAIDA (ausente = todas).
+export const fotoQuerySchema = z.object({
+  momento: z.enum(MOMENTOS_FOTO).optional(),
+})
+export type FotoQueryInput = z.infer<typeof fotoQuerySchema>

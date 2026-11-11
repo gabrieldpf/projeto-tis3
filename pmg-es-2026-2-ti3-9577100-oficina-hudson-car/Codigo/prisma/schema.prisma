@@ -45,6 +45,7 @@ model Usuario {
   aditivosCriados     AditivoOrcamento[]    @relation("AditivosCriados")
   aditivosRegistrados AditivoOrcamento[]    @relation("AditivosRegistrados")
   presencas           PresencaEdicao[]      @relation("PresencasEdicao")
+  fotosCriadas        Foto[]                @relation("FotosCriadas")
 }
 
 /// Fornecedores (~20 a 25). Peça é comprada sob demanda na maioria dos casos.
@@ -155,6 +156,7 @@ model Veiculo {
 
   orcamentos    Orcamento[]
   ordensServico OrdemServico[]
+  fotos         Foto[]
 
   @@index([chassi])
 }
@@ -260,6 +262,7 @@ model OrdemServico {
 
   garantias     GarantiaServico[]
   movimentacoes MovimentacaoEstoque[]
+  fotos         Foto[]
 
   @@index([clienteId])
   @@index([veiculoId])
@@ -353,4 +356,29 @@ model PresencaEdicao {
   @@unique([recurso, recursoId, usuarioId])
   @@index([recurso, recursoId])
   @@index([atualizadoEm])
+}
+
+/// Registro fotográfico do veículo (Sprint 4 — RF10). Evita disputa de avaria
+/// após a lavagem: fotografa-se a ENTRADA (recepção) e a SAIDA (entrega). O
+/// arquivo em si fica no Supabase Storage (bucket privado `veiculos`); aqui
+/// guardamos só o `path` + metadados. A URL de leitura é SEMPRE assinada e
+/// temporária (gerada na hora), por isso não é persistida. `momento` é String
+/// validado por Zod (ENTRADA | SAIDA), como os demais "enums" do schema.
+model Foto {
+  id             String        @id @default(cuid())
+  veiculoId      String
+  veiculo        Veiculo       @relation(fields: [veiculoId], references: [id], onDelete: Cascade)
+  ordemServicoId String?
+  ordemServico   OrdemServico? @relation(fields: [ordemServicoId], references: [id], onDelete: SetNull)
+  momento        String // ENTRADA | SAIDA
+  path           String // caminho no bucket (ex.: <veiculoId>/entrada/<uuid>.jpg)
+  legenda        String?
+  criadoPorId    String?
+  criadoPor      Usuario?      @relation("FotosCriadas", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  version        Int           @default(1)
+  createdAt      DateTime      @default(now())
+
+  @@index([veiculoId])
+  @@index([ordemServicoId])
+  @@index([veiculoId, momento])
 }

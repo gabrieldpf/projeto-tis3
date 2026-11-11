@@ -100,6 +100,26 @@ export const ROTULO_ORIGEM_PECA: Record<OrigemPeca, string> = {
 export const RECURSOS_PRESENCA = ['ORCAMENTO', 'ADITIVO'] as const
 export type RecursoPresenca = (typeof RECURSOS_PRESENCA)[number]
 
+// --- Sprint 4: Fotos do veículo (RF10) ---------------------------------------
+// Momento do registro: ENTRADA (recepção) ou SAIDA (entrega, carro lavado).
+export const MOMENTOS_FOTO = ['ENTRADA', 'SAIDA'] as const
+export type MomentoFoto = (typeof MOMENTOS_FOTO)[number]
+
+export const ROTULO_MOMENTO_FOTO: Record<MomentoFoto, string> = {
+  ENTRADA: 'Entrada',
+  SAIDA: 'Saída',
+}
+
+// Tipos de imagem aceitos no upload de fotos e tamanho máximo por arquivo.
+// (A validação rigorosa de conteúdo/limpeza é da Q2 — aqui fica o básico.)
+export const FOTO_MIME_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'] as const
+export type FotoMime = (typeof FOTO_MIME_PERMITIDOS)[number]
+
+export const FOTO_TAMANHO_MAX_BYTES = 10 * 1024 * 1024 // 10 MB
+
+// Validade da URL assinada de leitura de uma foto (bucket privado).
+export const FOTO_URL_EXPIRA_SEGUNDOS = 60 * 60 // 1 hora
+
 // Tempo de vida de uma presença sem heartbeat (45s — expira e some da lista).
 export const PRESENCA_TTL_MS = 45_000
 
