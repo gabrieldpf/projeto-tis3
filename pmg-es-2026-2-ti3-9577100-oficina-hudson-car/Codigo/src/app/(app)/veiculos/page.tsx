@@ -22,12 +22,11 @@ import {
 import {
   IconeBusca,
   IconeAdicionar,
-  IconeFoto,
-  IconeVeiculo,
   IconeEditar,
   IconeGarantia,
 } from '@/components/icons'
 import { BadgeOrcamento, BadgeOS } from '@/components/Badges'
+import { FotosVeiculo } from '@/components/FotosVeiculo'
 import { moeda } from '@/utils/format'
 import type { StatusOrcamento, StatusOS } from '@/lib/constants'
 
@@ -509,44 +508,8 @@ function PainelDetalhe({ veiculo, onEditar }: PainelDetalheProps) {
 
       {aba === 'dados' && (
         <>
-          {/* Fotos de entrada/saída */}
-          <div className="card">
-            <div className="card-head">
-              <div>
-                <h2>
-                  <IconeFoto sx={{ fontSize: 18, verticalAlign: '-3px' }} /> Fotos de
-                  entrada / saída
-                </h2>
-                <p>Registro do estado do veículo (evita disputas)</p>
-              </div>
-            </div>
-            <div className="card-body">
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                {['Entrada · frente', 'Entrada · lateral', 'Saída · frente', 'Saída · lavado'].map(
-                  (legenda) => (
-                    <div key={legenda} style={{ width: 140, textAlign: 'center' }}>
-                      <div
-                        style={{
-                          height: 96,
-                          borderRadius: 8,
-                          background:
-                            'repeating-linear-gradient(45deg,#eef1f5,#eef1f5 8px,#e3e8ef 8px,#e3e8ef 16px)',
-                          display: 'grid',
-                          placeItems: 'center',
-                          color: '#94a3b8',
-                        }}
-                      >
-                        <IconeVeiculo sx={{ fontSize: 40 }} />
-                      </div>
-                      <span className="txt-suave" style={{ fontSize: 12 }}>
-                        {legenda}
-                      </span>
-                    </div>
-                  ),
-                )}
-              </div>
-            </div>
-          </div>
+          {/* Fotos de entrada (R1 · RF10) — captura real pela câmera do celular */}
+          <FotosVeiculo veiculoId={veiculo.id} />
 
           {/* Orçamentos e OS — dados reais */}
           {carregandoDetalhe && (
